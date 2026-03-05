@@ -1,0 +1,26 @@
+# PulseGlucose API Platform
+
+PulseGlucoseApi is a backend first integration surface for glucose consumers across web clients, desktop apps, terminals, and embedded displays.
+
+## Why this API exists
+
+The API combines two glucose paths with clear responsibilities.
+
+- Share path for near real time app updates.
+- Official path for long term analysis and audit history.
+
+This separation avoids stale UI while preserving durable history.
+
+## Integration model
+
+1. Create one consumer API key.
+2. Use it on all consumer routes via `Authorization: Bearer <apiKey>`.
+3. Choose source per use case.
+4. Keep streams open while app is active.
+5. Use history endpoints to recover missed updates after reconnect.
+
+## Operational trust
+
+- Public status endpoint for pipeline health.
+- Contract backed endpoint docs.
+- Agent ready JSON context mirrors.

@@ -1,0 +1,19 @@
+# Authentication
+
+Consumer integrations use one API key model.
+
+## Required header
+
+`Authorization: Bearer <apiKey>`
+
+## Key handling
+
+- Store keys in secure platform storage.
+- Never hardcode keys in frontend bundles.
+- Rotate keys when an app is decommissioned.
+
+## Error patterns
+
+- `missing_api_key` means header missing.
+- `invalid_api_key` means unknown key.
+- `revoked_api_key` means key was deleted or revoked.

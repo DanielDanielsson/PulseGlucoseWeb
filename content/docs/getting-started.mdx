@@ -1,0 +1,26 @@
+# Getting Started
+
+Build your first consumer integration in minutes.
+
+## 1. Base URL
+
+Use `https://glucose-nu.vercel.app` unless your deployment uses another environment.
+
+## 2. Authentication
+
+Send this header on consumer requests:
+
+`Authorization: Bearer <apiKey>`
+
+## 3. First endpoint to call
+
+Use `/api/v1/share/glucose/latest` for live UI data.
+
+## 4. Source selection rule
+
+- Share endpoints for near real time app state.
+- Official endpoints for long term analytics.
+
+## 5. Reconnect strategy
+
+For stream based flows, recover with history endpoints before resubscribing.

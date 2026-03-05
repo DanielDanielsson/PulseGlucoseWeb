@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PulseGlucoseWeb
 
-## Getting Started
+Public product site and documentation portal for PulseGlucose ecosystem.
 
-First, run the development server:
+## What this project contains
+
+- Marketing and trust pages for potential clients
+- Consumer app showcase
+- Public consumer API docs generated from machine contracts
+- Agent focused page and raw JSON mirrors
+
+## Stack
+
+- Next.js App Router
+- Tailwind CSS
+- MDX
+- Zod
+- OpenAPI types
+- Vitest and Playwright
+
+## Routes
+
+- `/`
+- `/api`
+- `/apps`
+- `/docs`
+- `/docs/getting-started`
+- `/docs/authentication`
+- `/docs/workflows`
+- `/docs/endpoints`
+- `/docs/endpoints/[id]`
+- `/docs/errors`
+- `/agents`
+- `/agents/context.json`
+- `/agents/openapi.json`
+
+## Environment
+
+Copy `.env.example` to `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SITE_URL=https://pulse-glucose-web.vercel.app
+PULSE_API_BASE_URL=https://glucose-nu.vercel.app
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Contract flow
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Canonical contracts stay in PulseGlucoseApi
+- This project fetches:
+  - `${PULSE_API_BASE_URL}/docs/openapi.json`
+  - `${PULSE_API_BASE_URL}/docs/agent-context.json`
+- Fetch is server side with 10 minute revalidation
+- If remote fetch fails, bundled snapshots in `content/contracts/*.snapshot.json` are used
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run test:e2e`
+- `npm run test:links`
+- `npm run contracts:validate`
 
-To learn more about Next.js, take a look at the following resources:
+## CI checks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+GitHub Actions runs lint, typecheck, unit tests, contract validation, broken link check, build, and Playwright smoke tests.

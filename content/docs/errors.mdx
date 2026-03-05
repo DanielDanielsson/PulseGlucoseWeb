@@ -1,0 +1,14 @@
+# Errors and Troubleshooting
+
+Error responses use a stable envelope with `code` and `message` fields.
+
+## First response strategy
+
+1. Check status code.
+2. Branch on `code`.
+3. Apply the action guidance from this page.
+
+## Retry guidance
+
+- Do not retry auth failures without a new credential.
+- Retry transient network and 5xx failures with capped backoff.

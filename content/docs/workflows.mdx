@@ -1,0 +1,23 @@
+# Workflows
+
+## Web apps
+
+- Render live glucose from Share latest endpoint.
+- Use stream endpoints while app is active.
+- Backfill missed range from history endpoints after reconnect.
+
+## Mobile apps
+
+- Favor short polling + stream fallback for unstable networks.
+- Cache latest successful reading locally.
+
+## CLI tools
+
+- Poll latest endpoint on interval for dashboards.
+- Use notification history for deterministic replay.
+
+## Raspberry Pi or embedded
+
+- Keep a local ring buffer.
+- Reconnect streams with exponential backoff.
+- Refresh profile content on `settings.profile.updated` events.

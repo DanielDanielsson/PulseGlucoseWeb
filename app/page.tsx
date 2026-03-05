@@ -1,65 +1,74 @@
-import Image from "next/image";
+import { CtaLink } from '@/components/cta-link';
 
-export default function Home() {
+const trustSignals = [
+  'Consumer API docs generated from machine contracts',
+  'Share vs official source guidance built into every endpoint page',
+  'Agent ready JSON mirrors for tool based integration',
+  'Status endpoint link for operational transparency'
+];
+
+export default function HomePage() {
+  const softwareJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'PulseGlucoseWeb',
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'Web',
+    description: 'Product portal and public API docs for PulseGlucose ecosystem',
+    url: process.env.NEXT_PUBLIC_SITE_URL || 'https://pulse-glucose-web.vercel.app'
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+      />
+
+      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-cyan-900/20">
+          <p className="text-xs uppercase tracking-[0.25em] text-cyan-300">PulseGlucose Platform</p>
+          <h1 className="mt-4 text-4xl font-semibold leading-tight text-slate-100 sm:text-5xl">
+            Product site, app catalog, and docs portal for developers and AI agents.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
+            PulseGlucoseWeb is the public front door for integrations. It gives teams one place to evaluate
+            the platform, discover consumer apps, and build against contract backed API docs.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <CtaLink
+              href="/docs"
+              label="Open Docs"
+              eventName="cta_open_docs"
+              className="rounded-xl border border-cyan-300/40 bg-cyan-500/15 px-5 py-2.5 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/25"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <CtaLink
+              href="/apps"
+              label="View Apps"
+              eventName="cta_open_apps"
+              className="rounded-xl border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+            />
+            <a
+              href="https://glucose-nu.vercel.app/status"
+              className="rounded-xl border border-emerald-300/30 bg-emerald-500/10 px-5 py-2.5 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/20"
+            >
+              API Uptime
+            </a>
+          </div>
         </div>
-      </main>
-    </div>
+
+        <aside className="rounded-3xl border border-white/10 bg-slate-900/75 p-8">
+          <h2 className="text-xl font-semibold text-slate-100">Trust Signals</h2>
+          <ul className="mt-4 space-y-3 text-sm text-slate-300">
+            {trustSignals.map((signal) => (
+              <li key={signal} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                {signal}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      </section>
+    </main>
   );
 }

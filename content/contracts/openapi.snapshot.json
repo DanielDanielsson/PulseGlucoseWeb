@@ -1,0 +1,137 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PulseGlucoseApi",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://glucose-nu.vercel.app"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Service health",
+        "responses": {
+          "200": {
+            "description": "Health payload",
+            "content": {
+              "application/json": {
+                "example": {
+                  "ok": true,
+                  "service": "pulse-glucose-api",
+                  "timestamp": "2026-03-01T10:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/share/glucose/latest": {
+      "get": {
+        "summary": "Latest share glucose reading",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest reading",
+            "content": {
+              "application/json": {
+                "example": {
+                  "valueMmolL": 6.4,
+                  "valueMgDl": 115,
+                  "trend": "flat",
+                  "timestamp": "2026-03-01T10:00:00.000Z",
+                  "status": "ok",
+                  "source": "share_api"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/glucose/latest": {
+      "get": {
+        "summary": "Latest official glucose reading",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest reading",
+            "content": {
+              "application/json": {
+                "example": {
+                  "valueMmolL": 6.2,
+                  "valueMgDl": 112,
+                  "trend": "flat",
+                  "timestamp": "2026-03-01T09:55:00.000Z",
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/publish": {
+      "post": {
+        "summary": "Publish cross app notification",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "type": "timer.finished",
+                "payload": {
+                  "timerId": "meal-1"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "example": {
+                  "ok": true,
+                  "seq": 1042
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/keys": {
+      "post": {
+        "summary": "Create API key",
+        "security": [
+          {
+            "AdminBearer": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Created"
+          }
+        }
+      }
+    }
+  }
+}

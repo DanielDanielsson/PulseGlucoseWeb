@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-01T10:00:00.000Z",
+  "baseUrl": "https://glucose-nu.vercel.app",
+  "scope": "consumer",
+  "endpoints": [
+    {
+      "id": "share-latest",
+      "method": "GET",
+      "path": "/api/v1/share/glucose/latest",
+      "scope": "consumer",
+      "summary": "Primary low latency glucose endpoint",
+      "auth": "Bearer API key",
+      "source": "share"
+    },
+    {
+      "id": "official-latest",
+      "method": "GET",
+      "path": "/api/v1/glucose/latest",
+      "scope": "consumer",
+      "summary": "Official glucose endpoint for historical correctness",
+      "auth": "Bearer API key",
+      "source": "official"
+    }
+  ],
+  "errorCodes": [
+    {
+      "code": "missing_api_key",
+      "status": 401,
+      "message": "No API key was provided",
+      "action": "Send Authorization: Bearer <apiKey>"
+    },
+    {
+      "code": "invalid_api_key",
+      "status": 403,
+      "message": "The provided key is invalid",
+      "action": "Create a new key and update client configuration"
+    }
+  ],
+  "sourceGuidance": [
+    {
+      "source": "share",
+      "guidance": "Use share endpoints for near real time app updates"
+    },
+    {
+      "source": "official",
+      "guidance": "Use official endpoints for long term analysis and audit"
+    }
+  ]
+}
