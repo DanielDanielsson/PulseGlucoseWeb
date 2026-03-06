@@ -10,30 +10,31 @@ export default async function EndpointsPage() {
 
   return (
     <article>
-      <h1 className="text-3xl font-semibold text-slate-100">Endpoint Index</h1>
-      <p className="mt-3 text-slate-300">Generated from OpenAPI contract and filtered to consumer scope.</p>
+      <span className="eyebrow">Endpoint index</span>
+      <h1 className="mt-5">Consumer endpoint directory</h1>
+      <p>Generated from the OpenAPI contract and filtered to the public consumer scope.</p>
 
-      <div className="mt-8 overflow-hidden rounded-2xl border border-white/10">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800/70 text-slate-200">
+      <div className="table-shell mt-6">
+        <table>
+          <thead>
             <tr>
-              <th className="px-3 py-2">Group</th>
-              <th className="px-3 py-2">Method</th>
-              <th className="px-3 py-2">Path</th>
-              <th className="px-3 py-2">Summary</th>
+              <th>Group</th>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Summary</th>
             </tr>
           </thead>
           <tbody>
             {data.endpoints.map((endpoint) => (
-              <tr key={endpoint.id} className="border-t border-white/10 text-slate-300">
-                <td className="px-3 py-2">{endpoint.group}</td>
-                <td className="px-3 py-2 font-mono text-cyan-200">{endpoint.method}</td>
-                <td className="px-3 py-2 font-mono">
-                  <Link href={`/docs/endpoints/${endpoint.id}`} className="hover:text-cyan-200">
+              <tr key={endpoint.id}>
+                <td>{endpoint.group}</td>
+                <td className="font-[var(--font-plex-mono)] text-[var(--accent-strong)]">{endpoint.method}</td>
+                <td className="font-[var(--font-plex-mono)]">
+                  <Link href={`/docs/endpoints/${endpoint.id}`} className="text-[var(--text)] hover:text-[var(--accent-strong)]">
                     {endpoint.path}
                   </Link>
                 </td>
-                <td className="px-3 py-2">{endpoint.summary}</td>
+                <td>{endpoint.summary}</td>
               </tr>
             ))}
           </tbody>

@@ -10,31 +10,36 @@ export default async function DocsHomePage() {
 
   return (
     <article>
-      <h1 className="text-3xl font-semibold text-slate-100">Consumer API Documentation</h1>
-      <p className="mt-4 max-w-3xl leading-7 text-slate-300">
+      <span className="eyebrow">Documentation overview</span>
+      <h1 className="mt-5">Consumer API documentation</h1>
+      <p>
         This reference is generated from machine contracts and focused on consumer integrations across web,
-        mobile, CLI, and Raspberry Pi projects.
+        desktop, terminal, and embedded clients.
       </p>
 
-      <section className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase text-slate-400">Endpoint count</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-100">{data.endpoints.length}</p>
+      <section className="stats-grid mt-4">
+        <div className="panel-muted metric-card">
+          <p className="metric-card__label">Endpoint count</p>
+          <p className="metric-card__value">{data.endpoints.length}</p>
+          <p className="metric-card__copy">Public consumer routes exposed from the current contract snapshot.</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase text-slate-400">Contract version</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-100">{data.agentContext.version}</p>
+        <div className="panel-muted metric-card">
+          <p className="metric-card__label">Contract version</p>
+          <p className="metric-card__value">{data.agentContext.version}</p>
+          <p className="metric-card__copy">Version visible to humans and agents from the same source bundle.</p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase text-slate-400">Scope</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-100">{data.agentContext.scope}</p>
+        <div className="panel-muted metric-card">
+          <p className="metric-card__label">Scope</p>
+          <p className="metric-card__value">{data.agentContext.scope}</p>
+          <p className="metric-card__copy">Docs stay constrained to the consumer side of the platform.</p>
         </div>
       </section>
 
-      <section className="mt-8 rounded-xl border border-amber-300/35 bg-amber-500/10 p-4 text-sm text-amber-100">
-        <p className="font-semibold">Source strategy is critical</p>
-        <ul className="mt-2 list-disc space-y-1 pl-6">
-          <li>Use Share glucose endpoints for near real time updates.</li>
+      <section className="panel-muted inline-card mt-4">
+        <h2 className="inline-card__title">Source strategy is not optional</h2>
+        <p className="inline-card__copy">Use the right data source for the right job or the UX degrades fast.</p>
+        <ul>
+          <li>Use Share glucose endpoints for near real time app state.</li>
           <li>Use Official glucose endpoints for long term analysis and audit history.</li>
         </ul>
       </section>

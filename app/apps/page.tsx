@@ -7,7 +7,7 @@ const apps = [
   {
     title: 'PulseBar',
     platform: 'macOS menubar',
-    description: 'Desktop menubar monitor with quick glance glucose state and alert support.'
+    description: 'Desktop menubar monitor with quick glance glucose state, trend arrows, and alert support.'
   },
   {
     title: 'CLI Watcher',
@@ -17,7 +17,7 @@ const apps = [
   {
     title: 'Raspberry Pi Display',
     platform: 'Embedded',
-    description: 'Low power always on display mode with stream reconnect strategy and local cache.'
+    description: 'Low power always on display mode with reconnect strategy and local cache.'
   }
 ];
 
@@ -28,23 +28,27 @@ export const metadata = {
 
 export default function AppsPage() {
   return (
-    <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <header className="mb-8">
-        <h1 className="text-4xl font-semibold text-slate-100">Consumer Apps</h1>
-        <p className="mt-3 max-w-3xl text-slate-300">
-          Reference clients that use the same consumer API docs published in this portal.
-        </p>
-      </header>
+    <main className="page-frame">
+      <div className="shell-container section-stack">
+        <section className="panel hero-card">
+          <span className="eyebrow">Consumer apps</span>
+          <h1 className="section-title mt-6">One API surface. Multiple client forms.</h1>
+          <p className="section-copy mt-6">
+            The same consumer contract can power browsers, menu bar apps, terminals, and ambient displays.
+            The app layer changes. The source strategy and integration rules stay consistent.
+          </p>
+        </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        {apps.map((app) => (
-          <article key={app.title} className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-            <p className="text-xs uppercase tracking-wide text-cyan-300">{app.platform}</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-100">{app.title}</h2>
-            <p className="mt-3 text-sm leading-7 text-slate-300">{app.description}</p>
-          </article>
-        ))}
-      </section>
+        <section className="apps-grid">
+          {apps.map((app) => (
+            <article key={app.title} className="panel inline-card">
+              <p className="kicker">{app.platform}</p>
+              <h2 className="inline-card__title mt-3 text-2xl">{app.title}</h2>
+              <p className="inline-card__copy">{app.description}</p>
+            </article>
+          ))}
+        </section>
+      </div>
     </main>
   );
 }
