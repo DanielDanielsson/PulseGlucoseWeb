@@ -15,6 +15,21 @@ const plexMono = IBM_Plex_Mono({
   weight: ['400', '500']
 });
 
+const themeInitScript = `
+(() => {
+  try {
+    const stored = localStorage.getItem('pulse-theme');
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = stored === 'light' || stored === 'dark' ? stored : systemDark ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+  } catch {
+    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.style.colorScheme = 'dark';
+  }
+})();
+`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://pulse-glucose-web.vercel.app'),
   title: {
@@ -32,11 +47,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${spaceGrotesk.variable} ${plexMono.variable}`}>
+    <html lang="en" data-theme="dark" className={`${spaceGrotesk.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <body className="font-[var(--font-space-grotesk)] antialiased">
-        <SiteHeader />
-        {children}
-        <SiteFooter />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <div className="app-shell">
+          <SiteHeader />
+          {children}
+          <SiteFooter />
+        </div>
       </body>
     </html>
   );

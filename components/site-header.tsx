@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const LINKS = [
   { href: '/', label: 'Home' },
@@ -10,24 +11,26 @@ const LINKS = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0f172ad9] backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-wide text-cyan-200">
-          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.8)]" />
-          PulseGlucoseWeb
+    <header className="site-header">
+      <div className="shell-container site-header__inner">
+        <Link href="/" className="site-brand">
+          <span className="site-brand__pulse" />
+          <span>
+            <span className="site-brand__name">PulseGlucose</span>
+            <span className="site-brand__sub">clean docs for live glucose apps</span>
+          </span>
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-2 text-sm">
-          {LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-slate-200 transition hover:border-cyan-300/50 hover:bg-cyan-500/10"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="site-header__actions">
+          <nav className="site-nav" aria-label="Primary">
+            {LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="site-nav__link">
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
