@@ -1,13 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import useSWR, { useSWRConfig, type State as SWRState } from 'swr';
 import { GlucoseChart, type ChartPoint } from './glucose-chart';
+import { GLUCOSE_TIME_RANGES, getTimeRangeHours, type TimeRange } from '@/lib/glucose/time-ranges';
 
 interface LatestReading {
   valueMmolL: number;
   valueMgDl: number;
   trend: string;
   timestamp: string;
+  source: 'official' | 'share';
 }
 
 interface GlucoseApiResponse {
@@ -23,15 +26,111 @@ interface GlucoseApiResponse {
   error?: { message: string };
 }
 
-type TimeRange = '6h' | '12h' | '24h' | '3d' | '7d';
+interface GlucoseUpdatesResponse {
+  latest: LatestReading | null;
+  meta: {
+    since: string;
+    to: string;
+    newCount: number;
+  };
+  error?: { message: string };
+}
 
-const TIME_RANGES: { key: TimeRange; label: string; hours: number }[] = [
-  { key: '6h', label: '6h', hours: 6 },
-  { key: '12h', label: '12h', hours: 12 },
-  { key: '24h', label: '24h', hours: 24 },
-  { key: '3d', label: '3 days', hours: 72 },
-  { key: '7d', label: '7 days', hours: 168 }
-];
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  const json = (await response.json()) as T & { error?: { message?: string } };
+
+  if (!response.ok) {
+    throw new Error(json.error?.message || 'Request failed');
+  }
+
+  return json;
+}
+
+function getHistoryKey(range: TimeRange): string {
+  return `/api/dashboard/glucose/history?range=${range}`;
+}
+
+function getUpdatesKey(timestamp: string): string {
+  return `/api/dashboard/glucose/updates?since=${encodeURIComponent(timestamp)}`;
+}
+
+function getResponseFreshness(response: GlucoseApiResponse): number {
+  return new Date(response.latest?.timestamp ?? response.meta.to).getTime();
+}
+
+function getCachedHistoryData(
+  cache: ReturnType<typeof useSWRConfig>['cache'],
+  range: TimeRange
+): GlucoseApiResponse | undefined {
+  const state = cache.get(getHistoryKey(range)) as SWRState<GlucoseApiResponse> | undefined;
+  return state?.data;
+}
+
+function pickBestLoadedSourceRange(
+  cache: ReturnType<typeof useSWRConfig>['cache'],
+  targetRange: TimeRange
+): TimeRange | null {
+  const targetHours = getTimeRangeHours(targetRange);
+  if (!targetHours) {
+    return null;
+  }
+
+  let bestMatch: { key: TimeRange; hours: number; freshness: number } | null = null;
+
+  for (const timeRange of GLUCOSE_TIME_RANGES) {
+    if (timeRange.hours < targetHours) {
+      continue;
+    }
+
+    const data = getCachedHistoryData(cache, timeRange.key);
+    if (!data) {
+      continue;
+    }
+
+    const candidate = {
+      key: timeRange.key,
+      hours: timeRange.hours,
+      freshness: getResponseFreshness(data)
+    };
+
+    if (
+      !bestMatch ||
+      candidate.freshness > bestMatch.freshness ||
+      (candidate.freshness === bestMatch.freshness && candidate.hours > bestMatch.hours)
+    ) {
+      bestMatch = candidate;
+    }
+  }
+
+  return bestMatch?.key ?? null;
+}
+
+function buildVisibleRangeData(sourceData: GlucoseApiResponse, targetRange: TimeRange): GlucoseApiResponse {
+  const targetHours = getTimeRangeHours(targetRange);
+  if (!targetHours) {
+    return sourceData;
+  }
+
+  const rangeMs = targetHours * 60 * 60 * 1000;
+  const endMs = getResponseFreshness(sourceData);
+  const cutoffMs = endMs - rangeMs;
+  const items = sourceData.items.filter((item) => new Date(item.timestamp).getTime() >= cutoffMs);
+  const officialCount = items.filter((item) => item.source === 'official').length;
+  const shareCount = items.length - officialCount;
+
+  return {
+    ...sourceData,
+    items,
+    meta: {
+      from: new Date(cutoffMs).toISOString(),
+      to: new Date(endMs).toISOString(),
+      officialCount,
+      shareCount,
+      mergedCount: items.length
+    }
+  };
+}
 
 function computeStats(items: ChartPoint[]) {
   if (items.length === 0) {
@@ -45,12 +144,12 @@ function computeStats(items: ChartPoint[]) {
   let low = 0;
   let high = 0;
 
-  for (const p of items) {
-    sum += p.valueMmolL;
-    if (p.valueMmolL < min) min = p.valueMmolL;
-    if (p.valueMmolL > max) max = p.valueMmolL;
-    if (p.valueMmolL < 4.0) low++;
-    else if (p.valueMmolL > 10.0) high++;
+  for (const point of items) {
+    sum += point.valueMmolL;
+    if (point.valueMmolL < min) min = point.valueMmolL;
+    if (point.valueMmolL > max) max = point.valueMmolL;
+    if (point.valueMmolL < 4.0) low++;
+    else if (point.valueMmolL > 10.0) high++;
     else inRange++;
   }
 
@@ -83,77 +182,71 @@ function StatItem({ label, value, color }: { label: string; value: string; color
 }
 
 export function GlucoseAnalysisView() {
-  const [data, setData] = useState<ChartPoint[]>([]);
-  const [latest, setLatest] = useState<LatestReading | null>(null);
-  const [meta, setMeta] = useState<GlucoseApiResponse['meta'] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<TimeRange>('24h');
-
-  const fetchData = useCallback(async (timeRange: TimeRange) => {
-    setLoading(true);
-    setError(null);
-
-    const hours = TIME_RANGES.find((r) => r.key === timeRange)?.hours || 24;
-    const now = new Date();
-    const from = new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
-    const to = now.toISOString();
-    const limit = Math.min(hours * 12 + 100, 5000);
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/glucose/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&limit=${limit}`
-      );
-
-      const json = (await response.json()) as GlucoseApiResponse;
-
-      if (!response.ok) {
-        throw new Error(json.error?.message || 'Failed to load glucose data');
-      }
-
-      setData(json.items);
-      setLatest(json.latest);
-      setMeta(json.meta);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load glucose data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData(range);
-  }, [range, fetchData]);
-
-  useEffect(() => {
-    const interval = setInterval(() => fetchData(range), 2 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [range, fetchData]);
-
-  const stats = computeStats(data);
-
-  // Expose latest reading for the dashboard layout to pick up
-  useEffect(() => {
-    if (latest) {
-      window.dispatchEvent(new CustomEvent('pulse-glucose-latest', { detail: latest }));
-    }
-  }, [latest]);
-
   const [chartHeight, setChartHeight] = useState(560);
+  const [isApplyingUpdates, setIsApplyingUpdates] = useState(false);
+  const { cache, mutate: globalMutate } = useSWRConfig();
+
+  const loadedSourceRange = pickBestLoadedSourceRange(cache, range);
+  const sourceRange = loadedSourceRange ?? range;
+  const historyKey = getHistoryKey(sourceRange);
+  const {
+    data: sourceData,
+    error,
+    isLoading,
+    isValidating,
+    mutate
+  } = useSWR<GlucoseApiResponse>(historyKey, fetchJson, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false
+  });
+  const data = sourceData ? buildVisibleRangeData(sourceData, range) : undefined;
+
+  const displayedLatestTimestamp = data?.latest?.timestamp ?? null;
+  const {
+    data: updates,
+    error: updatesError
+  } = useSWR<GlucoseUpdatesResponse>(
+    displayedLatestTimestamp ? getUpdatesKey(displayedLatestTimestamp) : null,
+    fetchJson,
+    {
+      refreshInterval: 2 * 60 * 1000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false
+    }
+  );
 
   useEffect(() => {
     setChartHeight(Math.max(500, window.innerHeight * 0.58));
   }, []);
 
+  useEffect(() => {
+    if (data?.latest) {
+      window.dispatchEvent(new CustomEvent('pulse-glucose-latest', { detail: data.latest }));
+    }
+  }, [data?.latest]);
+
+  const stats = computeStats(data?.items ?? []);
+  const newReadingsCount = updates?.meta.newCount ?? 0;
+  const showLoadingOverlay = !data && isLoading;
+
+  async function applyUpdates() {
+    setIsApplyingUpdates(true);
+    try {
+      await globalMutate(historyKey);
+    } finally {
+      setIsApplyingUpdates(false);
+    }
+  }
+
   return (
     <div className="glucose-analysis-fullwidth">
-      {/* Chart panel — breaks out of dashboard container for full width */}
       <section className="panel" style={{
         borderRadius: 'var(--radius-2xl)',
         overflow: 'hidden',
         padding: 0
       }}>
-        {/* Toolbar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -174,33 +267,45 @@ export function GlucoseAnalysisView() {
             }}>
               Timeline
             </span>
-            {TIME_RANGES.map((r) => (
+            {GLUCOSE_TIME_RANGES.map((timeRange) => (
               <button
-                key={r.key}
+                key={timeRange.key}
                 type="button"
-                onClick={() => setRange(r.key)}
-                className={range === r.key ? 'button-primary' : 'button-ghost'}
+                onClick={() => setRange(timeRange.key)}
+                className={range === timeRange.key ? 'button-primary' : 'button-ghost'}
                 style={{ minHeight: '2rem', padding: '0 0.75rem', fontSize: '0.78rem' }}
               >
-                {r.label}
+                {timeRange.label}
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {meta && !loading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {newReadingsCount > 0 && (
+              <button
+                type="button"
+                onClick={applyUpdates}
+                className="button-primary"
+                disabled={isApplyingUpdates}
+                style={{ minHeight: '2rem', padding: '0 0.85rem', fontSize: '0.78rem' }}
+              >
+                {isApplyingUpdates
+                  ? 'Loading readings...'
+                  : `Load ${newReadingsCount} new reading${newReadingsCount === 1 ? '' : 's'}`}
+              </button>
+            )}
+            {data && !showLoadingOverlay && (
               <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
-                {meta.mergedCount} readings ({meta.officialCount} official + {meta.shareCount} share)
+                {data.meta.mergedCount} readings ({data.meta.officialCount} official + {data.meta.shareCount} share)
               </span>
             )}
             <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
-              Drag to pan · Ctrl+scroll to zoom
+              Drag to pan · Ctrl or Cmd + scroll to zoom
             </span>
           </div>
         </div>
 
-        {/* Chart area */}
         <div style={{ position: 'relative', minHeight: chartHeight }}>
-          {loading && (
+          {showLoadingOverlay && (
             <div style={{
               position: 'absolute',
               inset: 0,
@@ -216,7 +321,7 @@ export function GlucoseAnalysisView() {
             </div>
           )}
 
-          {error && !loading && (
+          {error && !showLoadingOverlay && (
             <div style={{
               position: 'absolute',
               inset: 0,
@@ -227,10 +332,10 @@ export function GlucoseAnalysisView() {
               gap: 12,
               zIndex: 5
             }}>
-              <p style={{ fontSize: 13, color: '#fb7185' }}>{error}</p>
+              <p style={{ fontSize: 13, color: '#fb7185' }}>{error.message}</p>
               <button
                 type="button"
-                onClick={() => fetchData(range)}
+                onClick={() => mutate()}
                 className="button-secondary"
                 style={{ minHeight: '2.25rem', fontSize: '0.82rem' }}
               >
@@ -239,7 +344,7 @@ export function GlucoseAnalysisView() {
             </div>
           )}
 
-          {!loading && !error && data.length === 0 && (
+          {!error && data && data.items.length === 0 && !showLoadingOverlay && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -252,15 +357,14 @@ export function GlucoseAnalysisView() {
             </div>
           )}
 
-          {!error && data.length > 0 && (
-            <div style={{ opacity: loading ? 0.3 : 1, transition: 'opacity 200ms ease' }}>
-              <GlucoseChart data={data} height={chartHeight} />
+          {!error && data && data.items.length > 0 && (
+            <div style={{ opacity: isValidating || isApplyingUpdates ? 0.55 : 1, transition: 'opacity 200ms ease' }}>
+              <GlucoseChart data={data.items} height={chartHeight} />
             </div>
           )}
         </div>
 
-        {/* Stats bar below chart */}
-        {!loading && data.length > 0 && (
+        {!showLoadingOverlay && !error && data && data.items.length > 0 && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -277,6 +381,7 @@ export function GlucoseAnalysisView() {
             <StatItem label="In range" value={`${stats.inRange}%`} color="#34d399" />
             <StatItem label="Low" value={`${stats.low}%`} color="#fb7185" />
             <StatItem label="High" value={`${stats.high}%`} color="#fbbf24" />
+            {updatesError && <StatItem label="Updates" value="poll failed" color="#fb7185" />}
           </div>
         )}
       </section>

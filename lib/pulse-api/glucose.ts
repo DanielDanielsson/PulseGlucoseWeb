@@ -18,6 +18,10 @@ export interface MergedGlucosePoint {
   source: 'official' | 'share';
 }
 
+function getReadingMinuteKey(timestamp: string): number {
+  return Math.floor(new Date(timestamp).getTime() / 60_000);
+}
+
 function getRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -83,6 +87,23 @@ export async function fetchGlucoseLatest(
   return response.json() as Promise<PulseApiReading>;
 }
 
+export function pickLatestGlucoseReading(
+  official: PulseApiReading | null,
+  share: PulseApiReading | null
+): PulseApiReading | null {
+  if (!official) return share;
+  if (!share) return official;
+
+  const officialKey = getReadingMinuteKey(official.timestamp);
+  const shareKey = getReadingMinuteKey(share.timestamp);
+
+  if (officialKey === shareKey) {
+    return official;
+  }
+
+  return officialKey > shareKey ? official : share;
+}
+
 /**
  * Merges official and share glucose readings into a single timeline.
  * Official readings are preferred. Share readings fill in the recent gap
@@ -95,8 +116,7 @@ export function mergeGlucoseReadings(
   const pointMap = new Map<number, MergedGlucosePoint>();
 
   for (const reading of official) {
-    const ts = new Date(reading.timestamp).getTime();
-    const key = Math.round(ts / 60_000);
+    const key = getReadingMinuteKey(reading.timestamp);
     pointMap.set(key, {
       timestamp: reading.timestamp,
       valueMmolL: reading.valueMmolL,
@@ -107,8 +127,7 @@ export function mergeGlucoseReadings(
   }
 
   for (const reading of share) {
-    const ts = new Date(reading.timestamp).getTime();
-    const key = Math.round(ts / 60_000);
+    const key = getReadingMinuteKey(reading.timestamp);
     if (!pointMap.has(key)) {
       pointMap.set(key, {
         timestamp: reading.timestamp,

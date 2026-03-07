@@ -1,51 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerSession } from '@/lib/auth';
 import {
-  fetchGlucoseHistory,
-  fetchGlucoseLatest,
-  mergeGlucoseReadings
-} from '@/lib/pulse-api/glucose';
-import type { PulseApiReading } from '@/lib/pulse-api/types';
-
-const API_MAX_LIMIT = 1000;
-const CHUNK_MS = 2.5 * 24 * 60 * 60 * 1000; // 2.5 days per chunk
-
-/**
- * Splits a time range into chunks small enough that each stays under the
- * API's max limit (~1000 readings = ~3.5 days at 5-min intervals).
- * Fetches all chunks in parallel and concatenates the results.
- */
-async function fetchOfficialChunked(from: string, to: string): Promise<PulseApiReading[]> {
-  const fromMs = new Date(from).getTime();
-  const toMs = new Date(to).getTime();
-  const rangeMs = toMs - fromMs;
-
-  if (rangeMs <= CHUNK_MS) {
-    const result = await fetchGlucoseHistory('official', from, to, API_MAX_LIMIT);
-    return result.items;
-  }
-
-  const chunks: { from: string; to: string }[] = [];
-  let cursor = fromMs;
-  while (cursor < toMs) {
-    const chunkEnd = Math.min(cursor + CHUNK_MS, toMs);
-    chunks.push({
-      from: new Date(cursor).toISOString(),
-      to: new Date(chunkEnd).toISOString()
-    });
-    cursor = chunkEnd;
-  }
-
-  const results = await Promise.all(
-    chunks.map((c) =>
-      fetchGlucoseHistory('official', c.from, c.to, API_MAX_LIMIT)
-        .then((r) => r.items)
-        .catch(() => [] as PulseApiReading[])
-    )
-  );
-
-  return results.flat();
-}
+  fetchLatestDashboardReading,
+  fetchMergedGlucoseWindow,
+  parseLimit,
+  resolveHistoryWindow
+} from '@/lib/glucose/dashboard-data';
 
 export async function GET(request: NextRequest) {
   const session = await getOwnerSession();
@@ -54,33 +14,54 @@ export async function GET(request: NextRequest) {
   }
 
   const params = request.nextUrl.searchParams;
+  const requestedLimit = parseLimit(params.get('limit'));
   const now = new Date();
-  const defaultFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const from = params.get('from') || defaultFrom;
-  const to = params.get('to') || now.toISOString();
+  const { from, to, hasExplicitRange } = resolveHistoryWindow({
+    range: params.get('range'),
+    from: params.get('from'),
+    to: params.get('to'),
+    now
+  });
 
   try {
-    const shareWindowStart = new Date(
-      Math.max(new Date(from).getTime(), now.getTime() - 4 * 60 * 60 * 1000)
-    ).toISOString();
+    const latest = await fetchLatestDashboardReading();
 
-    const [officialItems, share, latestShare] = await Promise.all([
-      fetchOfficialChunked(from, to).catch(() => [] as PulseApiReading[]),
-      fetchGlucoseHistory('share', shareWindowStart, to, 500).catch(() => ({ items: [] as PulseApiReading[] })),
-      fetchGlucoseLatest('share').catch(() => null)
-    ]);
+    if (!hasExplicitRange && requestedLimit === 1) {
+      return NextResponse.json({
+        items: latest
+          ? [
+              {
+                timestamp: latest.timestamp,
+                valueMmolL: latest.valueMmolL,
+                valueMgDl: latest.valueMgDl,
+                trend: latest.trend,
+                source: latest.source
+              }
+            ]
+          : [],
+        latest,
+        meta: {
+          from,
+          to,
+          officialCount: latest?.source === 'official' ? 1 : 0,
+          shareCount: latest?.source === 'share' ? 1 : 0,
+          mergedCount: latest ? 1 : 0
+        }
+      });
+    }
 
-    const merged = mergeGlucoseReadings(officialItems, share.items);
+    const { officialItems, shareItems, merged } = await fetchMergedGlucoseWindow(from, to, now);
+    const items = requestedLimit ? merged.slice(-requestedLimit) : merged;
 
     return NextResponse.json({
-      items: merged,
-      latest: latestShare,
+      items,
+      latest,
       meta: {
         from,
         to,
         officialCount: officialItems.length,
-        shareCount: share.items.length,
-        mergedCount: merged.length
+        shareCount: shareItems.length,
+        mergedCount: items.length
       }
     });
   } catch (error) {
