@@ -10,7 +10,7 @@ export default async function AgentsPage() {
 
   return (
     <main className="page-frame">
-      <div className="shell-container section-stack">
+      <div className="shell-container shell-container--wide section-stack">
         <section className="panel hero-card">
           <span className="eyebrow">Agent context</span>
           <h1 className="section-title mt-6">Machine readable entry points without scraping the site.</h1>

@@ -8,7 +8,7 @@ export const metadata = {
 export default function ApiPage() {
   return (
     <main className="page-frame">
-      <div className="shell-container section-stack">
+      <div className="shell-container shell-container--wide section-stack">
         <section className="panel hero-card">
           <span className="eyebrow">API platform</span>
           <h1 className="section-title mt-6">Backend first glucose delivery with clear source boundaries.</h1>

@@ -3,7 +3,7 @@ import Link from 'next/link';
 export function SiteFooter() {
   return (
     <footer className="site-footer">
-      <div className="shell-container site-footer__inner">
+      <div className="shell-container shell-container--wide site-footer__inner">
         <div>
           <p className="site-footer__title">PulseGlucoseWeb</p>
           <p className="site-footer__copy">Public docs, app references, and machine readable contracts.</p>

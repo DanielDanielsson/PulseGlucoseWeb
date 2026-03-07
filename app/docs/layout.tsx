@@ -11,10 +11,10 @@ export default async function DocsLayout({ children }: Readonly<{ children: Reac
 
   return (
     <main className="page-frame">
-      <div className="shell-container docs-layout">
+      <div className="shell-container shell-container--docs docs-layout">
         <DocsSidebar groups={groups} />
 
-        <div className="section-stack">
+        <div className="section-stack docs-main">
           <ContractBanner stale={docsData.stale} lastUpdated={docsData.lastUpdated} />
           <div className="panel content-shell p-6 sm:p-8">{children}</div>
         </div>

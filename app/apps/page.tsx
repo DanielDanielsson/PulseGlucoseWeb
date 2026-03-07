@@ -29,7 +29,7 @@ export const metadata = {
 export default function AppsPage() {
   return (
     <main className="page-frame">
-      <div className="shell-container section-stack">
+      <div className="shell-container shell-container--wide section-stack">
         <section className="panel hero-card">
           <span className="eyebrow">Consumer apps</span>
           <h1 className="section-title mt-6">One API surface. Multiple client forms.</h1>

@@ -62,7 +62,7 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
       />
 
-      <div className="shell-container section-stack">
+      <div className="shell-container shell-container--wide section-stack">
         <section className="hero-grid">
           <div className="panel hero-card">
             <span className="eyebrow">PulseGlucose platform</span>
@@ -111,7 +111,7 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section className="cards-grid">
+        <section className="cards-grid cards-grid--feature">
           {featureCards.map((card) => (
             <article key={card.title} className="panel-muted inline-card">
               <h2 className="inline-card__title">{card.title}</h2>
