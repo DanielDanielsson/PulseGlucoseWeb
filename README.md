@@ -8,6 +8,7 @@ Public product site and documentation portal for PulseGlucose ecosystem.
 - Consumer app showcase
 - Public consumer API docs generated from machine contracts
 - Agent focused page and raw JSON mirrors
+- Private owner dashboard with a temporary POC sign in
 
 ## Stack
 
@@ -39,8 +40,11 @@ Public product site and documentation portal for PulseGlucose ecosystem.
 Copy `.env.example` to `.env.local`:
 
 ```bash
-NEXT_PUBLIC_SITE_URL=https://pulse-glucose-web.vercel.app
+AUTH_POC_EMAIL=owner@pulseglucose.local
+NEXT_PUBLIC_SITE_URL=http://localhost:3001
 PULSE_API_BASE_URL=https://glucose-nu.vercel.app
+PULSE_API_ADMIN_TOKEN=replace_with_existing_api_admin_bearer_token
+PULSE_API_STATUS_TOKEN=optional_existing_status_page_token
 ```
 
 ## Contract flow
@@ -63,6 +67,11 @@ PULSE_API_BASE_URL=https://glucose-nu.vercel.app
 - `npm run test:e2e`
 - `npm run test:links`
 - `npm run contracts:validate`
+
+## POC sign in
+
+For now the dashboard uses a temporary owner cookie instead of a real auth provider.
+Open `/login` and click `Sign in`.
 
 ## CI checks
 

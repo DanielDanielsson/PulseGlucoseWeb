@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getOwnerSession } from '@/lib/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const LINKS = [
@@ -9,10 +10,12 @@ const LINKS = [
   { href: '/agents', label: 'Agents' }
 ] as const;
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const session = await getOwnerSession();
+
   return (
     <header className="site-header">
-      <div className="shell-container site-header__inner">
+      <div className="shell-container shell-container--wide site-header__inner">
         <Link href="/" className="site-brand">
           <span className="site-brand__pulse" />
           <span>
@@ -29,7 +32,12 @@ export function SiteHeader() {
               </Link>
             ))}
           </nav>
-          <ThemeToggle />
+          <div className="site-header__utility">
+            <Link href={session ? '/dashboard' : '/login'} className="button-secondary site-header__cta">
+              {session ? 'Dashboard' : 'Sign in'}
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>
