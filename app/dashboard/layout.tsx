@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { SignOutButton } from '@/components/auth/sign-out-button';
+import { DashboardGlucoseBadge } from '@/components/glucose/dashboard-glucose-badge';
 import { requireOwnerSession } from '@/lib/auth';
 import { fetchConsumerProfile } from '@/lib/pulse-api/client';
 
 const DASHBOARD_LINKS = [
   { href: '/dashboard', label: 'Overview' },
+  { href: '/dashboard/glucose', label: 'Glucose' },
   { href: '/dashboard/settings', label: 'Settings' },
   { href: '/dashboard/integrations', label: 'Integrations' },
   { href: '/dashboard/api-keys', label: 'API Keys' }
@@ -25,7 +27,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   return (
     <main className="page-frame">
-      <div className="shell-container shell-container--dashboard section-stack">
+      <div className="dashboard-fullwidth-container section-stack">
         <section className="panel dashboard-hero">
           <div className="dashboard-hero__header">
             <div className="dashboard-hero__copy">
@@ -35,6 +37,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
               <p className="dashboard-hero__meta">Signed in as {session.user?.email}</p>
             </div>
             <div className="dashboard-hero__actions">
+              <DashboardGlucoseBadge />
               <span className="data-chip">Owner session</span>
               <SignOutButton />
             </div>
