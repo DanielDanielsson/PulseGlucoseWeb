@@ -1,22 +1,19 @@
 'use client';
 
 import { useRef, useEffect, useCallback, useState } from 'react';
+import type { ChartPoint } from '@/lib/glucose/types';
 
-export interface ChartPoint {
-  timestamp: string;
-  valueMmolL: number;
-  source: 'official' | 'share';
-}
+export type { ChartPoint } from '@/lib/glucose/types';
 
 interface GlucoseChartProps {
   data: ChartPoint[];
   height?: number;
+  yMax?: number;
 }
 
 const LOW_THRESHOLD = 4.0;
 const HIGH_THRESHOLD = 10.0;
 const Y_MIN = 2.0;
-const Y_MAX = 18.0;
 const PADDING = { top: 32, right: 24, bottom: 48, left: 56 };
 const MAX_PX_PER_MS = 0.04;
 const FIT_ALL_EPSILON = 0.001;
@@ -46,6 +43,12 @@ function formatTime(date: Date): string {
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function getDayStartMs(timestampMs: number): number {
+  const date = new Date(timestampMs);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 }
 
 function pickTickInterval(visibleDurationMs: number, chartWidth: number): number {
@@ -117,7 +120,40 @@ function findNearestIndex(values: number[], target: number): number {
     : prevIdx;
 }
 
-export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
+function getYAxisTicks(yMax: number): number[] {
+  const range = yMax - Y_MIN;
+  const targetTickCount = 8;
+  const roughStep = range / targetTickCount;
+
+  if (roughStep <= 1) {
+    const ticks: number[] = [];
+    for (let value = Y_MIN; value <= yMax; value += 1) {
+      ticks.push(value);
+    }
+    return ticks;
+  }
+
+  if (roughStep <= 2) {
+    const ticks: number[] = [];
+    for (let value = Y_MIN; value <= yMax; value += 2) {
+      ticks.push(value);
+    }
+    return ticks;
+  }
+
+  const step = 4;
+  const ticks: number[] = [Y_MIN];
+  for (let value = 4; value <= yMax; value += step) {
+    ticks.push(value);
+  }
+  if (ticks[ticks.length - 1] !== yMax) {
+    ticks.push(yMax);
+  }
+
+  return ticks;
+}
+
+export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -210,8 +246,8 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
     }
 
     function yForValue(value: number): number {
-      const clamped = clamp(value, Y_MIN, Y_MAX);
-      return PADDING.top + chartHeight * (1 - (clamped - Y_MIN) / (Y_MAX - Y_MIN));
+      const clamped = clamp(value, Y_MIN, yMax);
+      return PADDING.top + chartHeight * (1 - (clamped - Y_MIN) / (yMax - Y_MIN));
     }
 
     const style = getComputedStyle(document.documentElement);
@@ -221,6 +257,26 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
 
     const yLow = yForValue(LOW_THRESHOLD);
     const yHigh = yForValue(HIGH_THRESHOLD);
+    const firstDayStartMs = getDayStartMs(visibleStartMs);
+
+    for (let dayStartMs = firstDayStartMs; dayStartMs <= visibleEndMs + 24 * 60 * 60 * 1000; dayStartMs += 24 * 60 * 60 * 1000) {
+      const nextDayStartMs = dayStartMs + 24 * 60 * 60 * 1000;
+      const segmentStartMs = Math.max(dayStartMs, visibleStartMs);
+      const segmentEndMs = Math.min(nextDayStartMs, visibleEndMs);
+
+      if (segmentEndMs <= segmentStartMs) {
+        continue;
+      }
+
+      const dayIndex = Math.floor((dayStartMs - firstDayStartMs) / (24 * 60 * 60 * 1000));
+      if (dayIndex % 2 === 0) {
+        const bandX = xForTimestamp(segmentStartMs);
+        const bandWidth = (segmentEndMs - segmentStartMs) * pxPerMs;
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.025)';
+        ctx.fillRect(bandX, PADDING.top, bandWidth, chartHeight);
+      }
+    }
+
     ctx.fillStyle = 'rgba(52, 211, 153, 0.06)';
     ctx.fillRect(PADDING.left, yHigh, chartWidth, yLow - yHigh);
 
@@ -243,7 +299,7 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
     ctx.font = '11px var(--font-plex-mono), monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    const yTicks = [2, 4, 6, 8, 10, 12, 14, 16, 18];
+    const yTicks = getYAxisTicks(yMax);
     for (const tick of yTicks) {
       const y = yForValue(tick);
       ctx.fillStyle = tick === LOW_THRESHOLD || tick === HIGH_THRESHOLD ? 'rgba(255,255,255,0.5)' : textSoft;
@@ -261,6 +317,24 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
     const tickIntervalMs = pickTickInterval(visibleDurationMs, chartWidth);
     const firstTickMs = Math.ceil(visibleStartMs / tickIntervalMs) * tickIntervalMs;
     let previousDateLabel = '';
+
+    for (let dayStartMs = firstDayStartMs; dayStartMs <= visibleEndMs + 24 * 60 * 60 * 1000; dayStartMs += 24 * 60 * 60 * 1000) {
+      if (dayStartMs < visibleStartMs || dayStartMs > visibleEndMs) {
+        continue;
+      }
+
+      const x = xForTimestamp(dayStartMs);
+      if (x < PADDING.left || x > PADDING.left + chartWidth) {
+        continue;
+      }
+
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, PADDING.top);
+      ctx.lineTo(x, PADDING.top + chartHeight);
+      ctx.stroke();
+    }
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
@@ -385,7 +459,7 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
       ctx.roundRect(barX, barY, barWidth, 3, 1.5);
       ctx.fill();
     }
-  }, [chartHeight, chartWidth, containerWidth, data, height, hoveredIndex, timeEndMs, timeStartMs, timestamps, totalDurationMs]);
+  }, [chartHeight, chartWidth, containerWidth, data, height, hoveredIndex, timeEndMs, timeStartMs, timestamps, totalDurationMs, yMax]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);
@@ -393,13 +467,12 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
   }, [draw]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-
     if (chartWidth <= 0 || totalDurationMs <= 0 || pxPerMsRef.current <= 0) {
       return;
     }
 
     if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
       const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
       const mouseX = clamp(e.offsetX - PADDING.left, 0, chartWidth);
       const oldPxPerMs = pxPerMsRef.current;
@@ -413,8 +486,11 @@ export function GlucoseChart({ data, height = 400 }: GlucoseChartProps) {
         pxPerMsRef.current = newPxPerMs;
         scrollRef.current = (targetTimeMs - timeStartMs) * newPxPerMs - mouseX;
       }
+    } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 0) {
+      e.preventDefault();
+      scrollRef.current += e.deltaX;
     } else {
-      scrollRef.current += e.deltaX || e.deltaY;
+      return;
     }
 
     clampScroll();

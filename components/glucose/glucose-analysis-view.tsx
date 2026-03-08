@@ -1,40 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import useSWR, { useSWRConfig, type State as SWRState } from 'swr';
-import { GlucoseChart, type ChartPoint } from './glucose-chart';
-import { GLUCOSE_TIME_RANGES, getTimeRangeHours, type TimeRange } from '@/lib/glucose/time-ranges';
-
-interface LatestReading {
-  valueMmolL: number;
-  valueMgDl: number;
-  trend: string;
-  timestamp: string;
-  source: 'official' | 'share';
-}
-
-interface GlucoseApiResponse {
-  items: ChartPoint[];
-  latest: LatestReading | null;
-  meta: {
-    from: string;
-    to: string;
-    officialCount: number;
-    shareCount: number;
-    mergedCount: number;
-  };
-  error?: { message: string };
-}
-
-interface GlucoseUpdatesResponse {
-  latest: LatestReading | null;
-  meta: {
-    since: string;
-    to: string;
-    newCount: number;
-  };
-  error?: { message: string };
-}
+import useSWR, { useSWRConfig } from 'swr';
+import { GlucoseChart } from './glucose-chart';
+import { GlucoseAgpChart } from './glucose-agp-chart';
+import { GlucoseDateRangePicker } from './glucose-date-range-picker';
+import { GlucoseStatRing } from './glucose-stat-ring';
+import {
+  buildPresetWindow,
+  getHistoryCustomKey,
+  getHistoryRangeKey,
+  pickBestLoadedSourceKey,
+  sliceHistoryResponseToWindow,
+  type HistorySelection,
+  type HistoryWindow
+} from '@/lib/glucose/history-cache';
+import { computeGlucoseStats } from '@/lib/glucose/metrics';
+import { GLUCOSE_TIME_RANGES } from '@/lib/glucose/time-ranges';
+import type { GlucoseApiResponse, GlucoseUpdatesResponse } from '@/lib/glucose/types';
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -47,163 +30,88 @@ async function fetchJson<T>(url: string): Promise<T> {
   return json;
 }
 
-function getHistoryKey(range: TimeRange): string {
-  return `/api/dashboard/glucose/history?range=${range}`;
-}
-
 function getUpdatesKey(timestamp: string): string {
   return `/api/dashboard/glucose/updates?since=${encodeURIComponent(timestamp)}`;
 }
 
-function getResponseFreshness(response: GlucoseApiResponse): number {
-  return new Date(response.latest?.timestamp ?? response.meta.to).getTime();
-}
-
-function getCachedHistoryData(
-  cache: ReturnType<typeof useSWRConfig>['cache'],
-  range: TimeRange
-): GlucoseApiResponse | undefined {
-  const state = cache.get(getHistoryKey(range)) as SWRState<GlucoseApiResponse> | undefined;
-  return state?.data;
-}
-
-function pickBestLoadedSourceRange(
-  cache: ReturnType<typeof useSWRConfig>['cache'],
-  targetRange: TimeRange
-): TimeRange | null {
-  const targetHours = getTimeRangeHours(targetRange);
-  if (!targetHours) {
-    return null;
-  }
-
-  let bestMatch: { key: TimeRange; hours: number; freshness: number } | null = null;
-
-  for (const timeRange of GLUCOSE_TIME_RANGES) {
-    if (timeRange.hours < targetHours) {
-      continue;
-    }
-
-    const data = getCachedHistoryData(cache, timeRange.key);
-    if (!data) {
-      continue;
-    }
-
-    const candidate = {
-      key: timeRange.key,
-      hours: timeRange.hours,
-      freshness: getResponseFreshness(data)
-    };
-
-    if (
-      !bestMatch ||
-      candidate.freshness > bestMatch.freshness ||
-      (candidate.freshness === bestMatch.freshness && candidate.hours > bestMatch.hours)
-    ) {
-      bestMatch = candidate;
-    }
-  }
-
-  return bestMatch?.key ?? null;
-}
-
-function buildVisibleRangeData(sourceData: GlucoseApiResponse, targetRange: TimeRange): GlucoseApiResponse {
-  const targetHours = getTimeRangeHours(targetRange);
-  if (!targetHours) {
-    return sourceData;
-  }
-
-  const rangeMs = targetHours * 60 * 60 * 1000;
-  const endMs = getResponseFreshness(sourceData);
-  const cutoffMs = endMs - rangeMs;
-  const items = sourceData.items.filter((item) => new Date(item.timestamp).getTime() >= cutoffMs);
-  const officialCount = items.filter((item) => item.source === 'official').length;
-  const shareCount = items.length - officialCount;
-
-  return {
-    ...sourceData,
-    items,
-    meta: {
-      from: new Date(cutoffMs).toISOString(),
-      to: new Date(endMs).toISOString(),
-      officialCount,
-      shareCount,
-      mergedCount: items.length
-    }
-  };
-}
-
-function computeStats(items: ChartPoint[]) {
-  if (items.length === 0) {
-    return { avg: 0, min: 0, max: 0, inRange: 0, low: 0, high: 0 };
-  }
-
-  let sum = 0;
-  let min = Infinity;
-  let max = -Infinity;
-  let inRange = 0;
-  let low = 0;
-  let high = 0;
-
-  for (const point of items) {
-    sum += point.valueMmolL;
-    if (point.valueMmolL < min) min = point.valueMmolL;
-    if (point.valueMmolL > max) max = point.valueMmolL;
-    if (point.valueMmolL < 4.0) low++;
-    else if (point.valueMmolL > 10.0) high++;
-    else inRange++;
-  }
-
-  return {
-    avg: sum / items.length,
-    min,
-    max,
-    inRange: Math.round((inRange / items.length) * 100),
-    low: Math.round((low / items.length) * 100),
-    high: Math.round((high / items.length) * 100)
-  };
-}
-
-function StatItem({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatValue({
+  label,
+  value,
+  color,
+  prominent = false
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  prominent?: boolean;
+}) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+    <div style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
       <span style={{ fontSize: 11, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>
         {label}
       </span>
       <span style={{
-        fontSize: 13,
+        fontSize: prominent ? 22 : 16,
         fontWeight: 700,
         fontFamily: 'var(--font-plex-mono), monospace',
         color: color || 'var(--text)'
       }}>
         {value}
       </span>
-    </span>
+    </div>
   );
 }
 
+function getSelectionTargetWindow(
+  selection: HistorySelection,
+  sourceData: GlucoseApiResponse | undefined
+): HistoryWindow | null {
+  if (selection.kind === 'custom') {
+    return selection.window;
+  }
+
+  if (!sourceData) {
+    return null;
+  }
+
+  return buildPresetWindow(sourceData.meta.to, selection.range);
+}
+
 export function GlucoseAnalysisView() {
-  const [range, setRange] = useState<TimeRange>('24h');
+  const [selection, setSelection] = useState<HistorySelection>({
+    kind: 'preset',
+    range: '24h'
+  });
   const [chartHeight, setChartHeight] = useState(560);
+  const [chartYMaxInput, setChartYMaxInput] = useState('25');
   const [isApplyingUpdates, setIsApplyingUpdates] = useState(false);
   const { cache, mutate: globalMutate } = useSWRConfig();
 
-  const loadedSourceRange = pickBestLoadedSourceRange(cache, range);
-  const sourceRange = loadedSourceRange ?? range;
-  const historyKey = getHistoryKey(sourceRange);
+  const loadedSourceKey = pickBestLoadedSourceKey(cache, selection);
+  const requestKey =
+    selection.kind === 'preset'
+      ? getHistoryRangeKey(selection.range)
+      : getHistoryCustomKey(selection.window);
+  const sourceKey = loadedSourceKey ?? requestKey;
+
   const {
     data: sourceData,
     error,
     isLoading,
     isValidating,
     mutate
-  } = useSWR<GlucoseApiResponse>(historyKey, fetchJson, {
+  } = useSWR<GlucoseApiResponse>(sourceKey, fetchJson, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     revalidateIfStale: false
   });
-  const data = sourceData ? buildVisibleRangeData(sourceData, range) : undefined;
 
-  const displayedLatestTimestamp = data?.latest?.timestamp ?? null;
+  const targetWindow = getSelectionTargetWindow(selection, sourceData);
+  const data = sourceData && targetWindow
+    ? sliceHistoryResponseToWindow(sourceData, targetWindow)
+    : sourceData;
+
+  const displayedLatestTimestamp = selection.kind === 'preset' ? data?.latest?.timestamp ?? null : null;
   const {
     data: updates,
     error: updatesError
@@ -227,83 +135,163 @@ export function GlucoseAnalysisView() {
     }
   }, [data?.latest]);
 
-  const stats = computeStats(data?.items ?? []);
+  const stats = computeGlucoseStats(data?.items ?? []);
   const newReadingsCount = updates?.meta.newCount ?? 0;
   const showLoadingOverlay = !data && isLoading;
+  const parsedChartYMax = Number(chartYMaxInput);
+  const chartYMax = Number.isFinite(parsedChartYMax) ? Math.max(12, parsedChartYMax) : 25;
 
   async function applyUpdates() {
     setIsApplyingUpdates(true);
     try {
-      await globalMutate(historyKey);
+      await globalMutate(sourceKey);
     } finally {
       setIsApplyingUpdates(false);
     }
   }
 
+  const activePreset = selection.kind === 'preset' ? selection.range : null;
+  const customValue = selection.kind === 'custom' ? selection.window : null;
+
   return (
     <div className="glucose-analysis-fullwidth">
+      <section
+        className="panel"
+        style={{
+          position: 'sticky',
+          top: '4.75rem',
+          zIndex: 30,
+          borderRadius: 'var(--radius-2xl)',
+          padding: '1rem 1.25rem',
+          display: 'grid',
+          gap: '1rem'
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.9rem 1.5rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem 1rem', flexWrap: 'wrap', flex: '1 1 620px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+              {GLUCOSE_TIME_RANGES.map((timeRange) => (
+                <button
+                  key={timeRange.key}
+                  type="button"
+                  onClick={() => setSelection({ kind: 'preset', range: timeRange.key })}
+                  className={activePreset === timeRange.key ? 'button-primary' : 'button-ghost'}
+                  style={{ minHeight: '2rem', padding: '0 0.75rem', fontSize: '0.78rem' }}
+                >
+                  {timeRange.label}
+                </button>
+              ))}
+              <GlucoseDateRangePicker
+                value={customValue}
+                onApply={(window) => {
+                  setSelection({ kind: 'custom', window });
+                }}
+              />
+              {newReadingsCount > 0 && (
+                <button
+                  type="button"
+                  onClick={applyUpdates}
+                  className="button-primary"
+                  disabled={isApplyingUpdates}
+                  style={{ minHeight: '2rem', padding: '0 0.85rem', fontSize: '0.78rem', marginLeft: 6 }}
+                >
+                  {isApplyingUpdates
+                    ? 'Loading readings...'
+                  : `Load ${newReadingsCount} new reading${newReadingsCount === 1 ? '' : 's'}`}
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <label style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11,
+                color: 'var(--text-soft)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em'
+              }}>
+                <span>Top</span>
+                <input
+                  type="number"
+                  min={12}
+                  step={1}
+                  inputMode="numeric"
+                  value={chartYMaxInput}
+                  onChange={(event) => setChartYMaxInput(event.target.value)}
+                  style={{
+                    width: 72,
+                    minHeight: '2rem',
+                    padding: '0 0.65rem',
+                    borderRadius: '999px',
+                    border: '1px solid var(--border-strong)',
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    fontSize: 13,
+                    fontFamily: 'var(--font-plex-mono), monospace'
+                  }}
+                  aria-label="Chart top value in mmol/L"
+                />
+              </label>
+              {data && !showLoadingOverlay && (
+                <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
+                  {data.meta.mergedCount} readings ({data.meta.officialCount} official + {data.meta.shareCount} share)
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            flexWrap: 'wrap',
+            gap: '0.9rem 1.25rem'
+          }}>
+            {!showLoadingOverlay && !error && data && data.items.length > 0 && (
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginRight: '0.5rem', alignItems: 'flex-end' }}>
+                <StatValue label="Avg" value={stats.avg.toFixed(1)} prominent />
+                <StatValue label="Min" value={stats.min.toFixed(1)} color={stats.min < 4 ? '#fb7185' : undefined} />
+                <StatValue label="Max" value={stats.max.toFixed(1)} color={stats.max > 10 ? '#fbbf24' : undefined} />
+                {updatesError && <StatValue label="Updates" value="poll failed" color="#fb7185" />}
+              </div>
+            )}
+
+            {!showLoadingOverlay && !error && data && data.items.length > 0 && (
+              <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <GlucoseStatRing label="Very low" percentage={stats.veryLow.percentage} color="#e11d48" />
+                <GlucoseStatRing label="Low" percentage={stats.low.percentage} color="#fb7185" />
+                <GlucoseStatRing label="In range" percentage={stats.inRange.percentage} color="#34d399" />
+                <GlucoseStatRing label="High" percentage={stats.high.percentage} color="#fbbf24" />
+                <GlucoseStatRing label="Very high" percentage={stats.veryHigh.percentage} color="#f97316" />
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="panel" style={{
+        marginTop: '1rem',
         borderRadius: 'var(--radius-2xl)',
         overflow: 'hidden',
         padding: 0
       }}>
         <div style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.625rem 1.25rem',
-          borderBottom: '1px solid var(--border)',
-          flexWrap: 'wrap',
-          gap: '0.5rem'
+          justifyContent: 'flex-end',
+          padding: '0.75rem 1rem 0',
+          fontSize: 11,
+          color: 'var(--text-soft)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <span style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--accent)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.14em',
-              marginRight: 8
-            }}>
-              Timeline
-            </span>
-            {GLUCOSE_TIME_RANGES.map((timeRange) => (
-              <button
-                key={timeRange.key}
-                type="button"
-                onClick={() => setRange(timeRange.key)}
-                className={range === timeRange.key ? 'button-primary' : 'button-ghost'}
-                style={{ minHeight: '2rem', padding: '0 0.75rem', fontSize: '0.78rem' }}
-              >
-                {timeRange.label}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {newReadingsCount > 0 && (
-              <button
-                type="button"
-                onClick={applyUpdates}
-                className="button-primary"
-                disabled={isApplyingUpdates}
-                style={{ minHeight: '2rem', padding: '0 0.85rem', fontSize: '0.78rem' }}
-              >
-                {isApplyingUpdates
-                  ? 'Loading readings...'
-                  : `Load ${newReadingsCount} new reading${newReadingsCount === 1 ? '' : 's'}`}
-              </button>
-            )}
-            {data && !showLoadingOverlay && (
-              <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
-                {data.meta.mergedCount} readings ({data.meta.officialCount} official + {data.meta.shareCount} share)
-              </span>
-            )}
-            <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
-              Drag to pan · Ctrl or Cmd + scroll to zoom
-            </span>
-          </div>
+          <span>Drag to pan · Ctrl or Cmd + scroll to zoom</span>
         </div>
-
         <div style={{ position: 'relative', minHeight: chartHeight }}>
           {showLoadingOverlay && (
             <div style={{
@@ -359,32 +347,17 @@ export function GlucoseAnalysisView() {
 
           {!error && data && data.items.length > 0 && (
             <div style={{ opacity: isValidating || isApplyingUpdates ? 0.55 : 1, transition: 'opacity 200ms ease' }}>
-              <GlucoseChart data={data.items} height={chartHeight} />
+              <GlucoseChart data={data.items} height={chartHeight} yMax={chartYMax} />
             </div>
           )}
         </div>
-
-        {!showLoadingOverlay && !error && data && data.items.length > 0 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexWrap: 'wrap',
-            gap: '16px 28px',
-            padding: '10px 16px',
-            borderTop: '1px solid var(--border)',
-            background: 'var(--surface-muted)'
-          }}>
-            <StatItem label="Avg" value={stats.avg.toFixed(1)} />
-            <StatItem label="Min" value={stats.min.toFixed(1)} color={stats.min < 4 ? '#fb7185' : undefined} />
-            <StatItem label="Max" value={stats.max.toFixed(1)} color={stats.max > 10 ? '#fbbf24' : undefined} />
-            <StatItem label="In range" value={`${stats.inRange}%`} color="#34d399" />
-            <StatItem label="Low" value={`${stats.low}%`} color="#fb7185" />
-            <StatItem label="High" value={`${stats.high}%`} color="#fbbf24" />
-            {updatesError && <StatItem label="Updates" value="poll failed" color="#fb7185" />}
-          </div>
-        )}
       </section>
+
+      {!showLoadingOverlay && !error && data && data.items.length > 0 && (
+        <section className="panel" style={{ marginTop: '1rem', borderRadius: 'var(--radius-2xl)', overflow: 'hidden' }}>
+          <GlucoseAgpChart data={data.items} height={chartHeight} yMax={chartYMax} />
+        </section>
+      )}
     </div>
   );
 }
