@@ -51,7 +51,7 @@ export function DashboardGlucoseBadge() {
       value={latest.valueMmolL}
       trend={latest.trend}
       timestamp={latest.timestamp}
-      size="md"
+      size="lg"
     />
   );
 }

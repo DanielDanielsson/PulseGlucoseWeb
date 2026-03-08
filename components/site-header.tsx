@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 import { getOwnerSession } from '@/lib/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -36,6 +37,7 @@ export async function SiteHeader() {
             <Link href={session ? '/dashboard' : '/login'} className="button-secondary site-header__cta">
               {session ? 'Dashboard' : 'Sign in'}
             </Link>
+            {session && <SignOutButton />}
             <ThemeToggle />
           </div>
         </div>

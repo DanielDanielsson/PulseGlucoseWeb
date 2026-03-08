@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { SignOutButton } from '@/components/auth/sign-out-button';
 import { DashboardGlucoseBadge } from '@/components/glucose/dashboard-glucose-badge';
 import { requireOwnerSession } from '@/lib/auth';
 import { fetchConsumerProfile } from '@/lib/pulse-api/client';
@@ -13,7 +12,7 @@ const DASHBOARD_LINKS = [
 ] as const;
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const session = await requireOwnerSession();
+  await requireOwnerSession();
   let greetingName: string | null = null;
 
   try {
@@ -31,15 +30,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         <section className="panel dashboard-hero">
           <div className="dashboard-hero__header">
             <div className="dashboard-hero__copy">
-              <p className="kicker">PulseGlucose owner dashboard</p>
               <h1 className="dashboard-hero__title">{greetingName ? `Hi, ${greetingName}!` : 'Hi!'}</h1>
-              <p className="dashboard-hero__lede">Control the API from the web app.</p>
-              <p className="dashboard-hero__meta">Signed in as {session.user?.email}</p>
             </div>
             <div className="dashboard-hero__actions">
               <DashboardGlucoseBadge />
-              <span className="data-chip">Owner session</span>
-              <SignOutButton />
             </div>
           </div>
 
