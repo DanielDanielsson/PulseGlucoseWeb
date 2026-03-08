@@ -159,7 +159,7 @@ export function GlucoseAnalysisView() {
         className="panel"
         style={{
           position: 'sticky',
-          top: '4.75rem',
+          top: '0',
           zIndex: 30,
           borderRadius: 'var(--radius-2xl)',
           padding: '1rem 1.25rem',

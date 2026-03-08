@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Space_Grotesk, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { SiteHeader } from '@/components/site-header';
+import { SiteHeaderShell } from '@/components/site-header-shell';
 import { SiteFooter } from '@/components/site-footer';
 
 const spaceGrotesk = Space_Grotesk({
@@ -51,7 +52,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="font-[var(--font-space-grotesk)] antialiased">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <div className="app-shell">
-          <SiteHeader />
+          <SiteHeaderShell>
+            <SiteHeader />
+          </SiteHeaderShell>
           {children}
           <SiteFooter />
         </div>
