@@ -1,9 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 /* eslint-disable @next/next/no-img-element */
-import type { AlarmSound, ConsumerProfile, ConsumerProfileResponse } from '@/lib/pulse-api/types';
+import type {
+  AlarmSound,
+  ConsumerProfile,
+  ConsumerProfileResponse,
+  NotificationEvent,
+  SettingsProfileUpdatedPayload
+} from '@/lib/pulse-api/types';
 
 interface SettingsFormProps {
   initialProfile: ConsumerProfile;
@@ -120,11 +126,12 @@ export function SettingsForm({ initialProfile }: SettingsFormProps) {
     }
   }
 
-  async function reload() {
+  async function reload(successMessage = 'Settings reloaded') {
     setMessage('Reloading settings...');
     setMessageTone('neutral');
 
     const response = await fetch('/api/dashboard/settings/profile', {
+      cache: 'no-store',
       headers: {
         'x-user-timezone': browserTimeZone
       }
@@ -138,9 +145,74 @@ export function SettingsForm({ initialProfile }: SettingsFormProps) {
     }
 
     setProfile(data.profile);
-    setMessage('Settings reloaded');
+    setMessage(successMessage);
     setMessageTone('success');
   }
+
+  useEffect(() => {
+    setProfile(initialProfile);
+  }, [initialProfile]);
+
+  useEffect(() => {
+    const reloadLatestSettings = async (successMessage: string) => {
+      setMessage('Reloading settings...');
+      setMessageTone('neutral');
+
+      const response = await fetch('/api/dashboard/settings/profile', {
+        cache: 'no-store',
+        headers: {
+          'x-user-timezone': browserTimeZone
+        }
+      });
+
+      const data = (await response.json()) as ConsumerProfileResponse & { error?: { message?: string } };
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to reload settings');
+      }
+
+      setProfile(data.profile);
+      setMessage(successMessage);
+      setMessageTone('success');
+    };
+
+    const handleSettingsUpdated = async (event: Event) => {
+      const customEvent = event as CustomEvent<NotificationEvent<SettingsProfileUpdatedPayload>>;
+      const payload = customEvent.detail?.payload;
+      const message =
+        customEvent.detail?.type === 'settings.profile.updated'
+          ? 'Profile updated. Synced latest settings.'
+          : 'Settings updated. Synced latest settings.';
+
+      if (payload?.profile) {
+        setProfile((current) => ({
+          ...current,
+          firstName: payload.profile?.firstName ?? current.firstName,
+          lastName: payload.profile?.lastName ?? current.lastName,
+          displayName: payload.profile?.displayName ?? current.displayName,
+          timezone: payload.profile?.timezone ?? current.timezone,
+          glucoseUnit:
+            payload.profile?.glucoseUnit === 'mg/dL' || payload.profile?.glucoseUnit === 'mmol/L'
+              ? payload.profile.glucoseUnit
+              : current.glucoseUnit,
+          profileImageUrl: payload.profile?.profileImageUrl ?? current.profileImageUrl,
+          defaultAlarmSoundId: payload.profile?.defaultAlarmSoundId ?? current.defaultAlarmSoundId
+        }));
+      }
+
+      try {
+        await reloadLatestSettings(message);
+      } catch {
+        setMessage('Settings changed, but reload failed');
+        setMessageTone('error');
+      }
+    };
+
+    window.addEventListener('pulse-settings-updated', handleSettingsUpdated);
+
+    return () => {
+      window.removeEventListener('pulse-settings-updated', handleSettingsUpdated);
+    };
+  }, [browserTimeZone]);
 
   async function save() {
     const timezone = profile.timezone.trim();
@@ -210,7 +282,7 @@ export function SettingsForm({ initialProfile }: SettingsFormProps) {
           <p className="dashboard-section__meta">Manage the shared profile content used by connected apps.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={reload} className="button-secondary" disabled={saving}>
+          <button type="button" onClick={() => void reload()} className="button-secondary" disabled={saving}>
             Reload
           </button>
           <button type="button" onClick={save} className="button-primary" disabled={saving}>
