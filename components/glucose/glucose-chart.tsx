@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import type { ChartPoint } from '@/lib/glucose/types';
+import { getGlucoseColor, type GlucoseColorMode } from '@/lib/glucose/tints';
 
 export type { ChartPoint } from '@/lib/glucose/types';
 
@@ -9,6 +10,7 @@ interface GlucoseChartProps {
   data: ChartPoint[];
   height?: number;
   yMax?: number;
+  colorMode: GlucoseColorMode;
 }
 
 const LOW_THRESHOLD = 4.0;
@@ -29,12 +31,6 @@ const TICK_INTERVALS_MS = [
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max));
-}
-
-function getPointColor(value: number): string {
-  if (value < LOW_THRESHOLD) return '#fb7185';
-  if (value > HIGH_THRESHOLD) return '#fbbf24';
-  return '#34d399';
 }
 
 function formatTime(date: Date): string {
@@ -153,7 +149,7 @@ function getYAxisTicks(yMax: number): number[] {
   return ticks;
 }
 
-export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProps) {
+export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: GlucoseChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -283,13 +279,13 @@ export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProp
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
 
-    ctx.strokeStyle = 'rgba(251, 113, 133, 0.3)';
+    ctx.strokeStyle = getGlucoseColor(LOW_THRESHOLD, colorMode, 0.3);
     ctx.beginPath();
     ctx.moveTo(PADDING.left, yLow);
     ctx.lineTo(PADDING.left + chartWidth, yLow);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+    ctx.strokeStyle = getGlucoseColor(HIGH_THRESHOLD, colorMode, 0.3);
     ctx.beginPath();
     ctx.moveTo(PADDING.left, yHigh);
     ctx.lineTo(PADDING.left + chartWidth, yHigh);
@@ -393,7 +389,7 @@ export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProp
       const y2 = yForValue(data[i + 1].valueMmolL);
       const avgValue = (data[i].valueMmolL + data[i + 1].valueMmolL) / 2;
 
-      ctx.strokeStyle = getPointColor(avgValue);
+      ctx.strokeStyle = getGlucoseColor(avgValue, colorMode);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
@@ -405,7 +401,7 @@ export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProp
       for (let i = startIdx; i <= endIdx; i++) {
         const x = xForTimestamp(timestamps[i]);
         const y = yForValue(data[i].valueMmolL);
-        const color = getPointColor(data[i].valueMmolL);
+        const color = getGlucoseColor(data[i].valueMmolL, colorMode);
         const isShare = data[i].source === 'share';
 
         ctx.beginPath();
@@ -441,7 +437,7 @@ export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProp
 
       ctx.beginPath();
       ctx.arc(hoverX, hoverY, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = getPointColor(data[hoveredIndex].valueMmolL);
+      ctx.fillStyle = getGlucoseColor(data[hoveredIndex].valueMmolL, colorMode);
       ctx.fill();
     }
 
@@ -459,7 +455,7 @@ export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProp
       ctx.roundRect(barX, barY, barWidth, 3, 1.5);
       ctx.fill();
     }
-  }, [chartHeight, chartWidth, containerWidth, data, height, hoveredIndex, timeEndMs, timeStartMs, timestamps, totalDurationMs, yMax]);
+  }, [chartHeight, chartWidth, colorMode, containerWidth, data, height, hoveredIndex, timeEndMs, timeStartMs, timestamps, totalDurationMs, yMax]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);
@@ -627,7 +623,7 @@ export function GlucoseChart({ data, height = 400, yMax = 25 }: GlucoseChartProp
             fontSize: 20,
             fontWeight: 700,
             fontFamily: 'var(--font-plex-mono), monospace',
-            color: getPointColor(hoveredPoint.valueMmolL)
+            color: getGlucoseColor(hoveredPoint.valueMmolL, colorMode)
           }}>
             {hoveredPoint.valueMmolL.toFixed(1)} <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>mmol/L</span>
           </p>
