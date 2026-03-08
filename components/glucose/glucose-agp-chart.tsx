@@ -292,24 +292,25 @@ export function GlucoseAgpChart({ data, height = 320, yMax = 25 }: GlucoseAgpCha
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '10px 18px',
+          gap: '6px 14px',
           flexWrap: 'wrap',
           fontSize: 11,
-          color: 'var(--text-soft)'
+          color: 'var(--text-soft)',
+          minWidth: 0
         }}>
-          <span>{activeSummary}</span>
-          <span>Median</span>
-          <span>50% band</span>
-          <span>80% band</span>
-          <span>5% / 95%</span>
+          <span style={{ whiteSpace: 'nowrap' }}>{activeSummary}</span>
+          <span style={{ whiteSpace: 'nowrap', opacity: 0.7 }}>Median · 50% · 80% band · 5%/95%</span>
         </div>
       </div>
 
       <div style={{
         display: 'flex',
-        gap: '0.45rem',
-        flexWrap: 'wrap',
-        marginBottom: '1rem'
+        gap: '0.35rem',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        marginBottom: '1rem',
+        paddingBottom: 2
       }}>
         {AGP_WEEKDAY_OPTIONS.map((option) => {
           const isActive = option.key === weekdayFilter;
@@ -322,19 +323,20 @@ export function GlucoseAgpChart({ data, height = 320, yMax = 25 }: GlucoseAgpCha
               onClick={() => setWeekdayFilter(option.key)}
               className={isActive ? 'button-primary' : 'button-ghost'}
               style={{
-                minHeight: '2.4rem',
-                padding: '0.35rem 0.75rem',
+                minHeight: '2.2rem',
+                padding: '0.25rem 0.625rem',
                 display: 'inline-flex',
                 flexDirection: 'column',
                 alignItems: 'flex-start',
                 justifyContent: 'center',
-                gap: 2,
-                minWidth: '4.4rem'
+                gap: 1,
+                flexShrink: 0,
+                minWidth: '3.75rem'
               }}
             >
-              <span style={{ fontSize: '0.8rem', lineHeight: 1 }}>{option.shortLabel}</span>
-              <span style={{ fontSize: '0.68rem', lineHeight: 1, opacity: 0.75 }}>
-                {count} day{count === 1 ? '' : 's'}
+              <span style={{ fontSize: '0.775rem', lineHeight: 1 }}>{option.shortLabel}</span>
+              <span style={{ fontSize: '0.65rem', lineHeight: 1, opacity: 0.7 }}>
+                {count}d
               </span>
             </button>
           );
