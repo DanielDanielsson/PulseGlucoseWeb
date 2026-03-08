@@ -9,11 +9,34 @@ interface LatestReading {
   timestamp: string;
 }
 
+interface StreamEnvelope {
+  source?: string;
+  reading?: LatestReading;
+}
+
+function normalizeStreamPayload(raw: string): LatestReading | null {
+  try {
+    const parsed = JSON.parse(raw) as StreamEnvelope | LatestReading;
+    if ('reading' in parsed && parsed.reading) {
+      return parsed.reading;
+    }
+
+    if ('valueMmolL' in parsed && 'trend' in parsed && 'timestamp' in parsed) {
+      return parsed;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function DashboardGlucoseBadge() {
   const [latest, setLatest] = useState<LatestReading | null>(null);
 
   useEffect(() => {
     let mounted = true;
+    let eventSource: EventSource | null = null;
 
     async function fetchLatest() {
       try {
@@ -28,7 +51,32 @@ export function DashboardGlucoseBadge() {
       }
     }
 
+    function publishLatest(reading: LatestReading) {
+      setLatest(reading);
+      window.dispatchEvent(new CustomEvent('pulse-glucose-latest', { detail: reading }));
+    }
+
+    function connectStream() {
+      eventSource = new EventSource('/api/dashboard/glucose/stream');
+
+      eventSource.addEventListener('glucose_update', (event) => {
+        if (!mounted) {
+          return;
+        }
+
+        const reading = normalizeStreamPayload((event as MessageEvent).data);
+        if (reading) {
+          publishLatest(reading);
+        }
+      });
+
+      eventSource.addEventListener('stream_error', async () => {
+        await fetchLatest();
+      });
+    }
+
     fetchLatest();
+    connectStream();
 
     function handleEvent(e: Event) {
       const detail = (e as CustomEvent).detail;
@@ -40,6 +88,7 @@ export function DashboardGlucoseBadge() {
     window.addEventListener('pulse-glucose-latest', handleEvent);
     return () => {
       mounted = false;
+      eventSource?.close();
       window.removeEventListener('pulse-glucose-latest', handleEvent);
     };
   }, []);
