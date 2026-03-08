@@ -41,23 +41,31 @@ function StatValue({
   label,
   value,
   color,
-  prominent = false
+  size = 'sm'
 }: {
   label: string;
   value: string;
   color?: string;
-  prominent?: boolean;
+  size?: 'sm' | 'lg';
 }) {
   return (
-    <div style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
-      <span style={{ fontSize: 11, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>
+    <div style={{ display: 'grid', gap: size === 'lg' ? 5 : 3, alignContent: 'start' }}>
+      <span style={{
+        fontSize: 10,
+        color: 'var(--text-soft)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.12em',
+        fontWeight: 600,
+        lineHeight: 1
+      }}>
         {label}
       </span>
       <span style={{
-        fontSize: prominent ? 22 : 16,
-        fontWeight: 700,
+        fontSize: size === 'lg' ? 30 : 14,
+        fontWeight: size === 'lg' ? 700 : 600,
         fontFamily: 'var(--font-plex-mono), monospace',
-        color: color || 'var(--text)'
+        color: color || 'var(--text)',
+        lineHeight: 1
       }}>
         {value}
       </span>
@@ -130,7 +138,11 @@ export function GlucoseAnalysisView() {
   );
 
   useEffect(() => {
-    setChartHeight(Math.max(500, window.innerHeight * 0.58));
+    const isMobile = window.innerWidth < 640;
+    setChartHeight(isMobile
+      ? Math.max(320, window.innerHeight * 0.45)
+      : Math.max(500, window.innerHeight * 0.58)
+    );
   }, []);
 
   useEffect(() => {
@@ -178,6 +190,8 @@ export function GlucoseAnalysisView() {
     }
   }
 
+  const avgColor = stats.avg < 4 ? '#fb7185' : stats.avg > 10 ? '#fbbf24' : '#34d399';
+
   return (
     <div className="glucose-analysis-fullwidth">
       <section
@@ -187,171 +201,187 @@ export function GlucoseAnalysisView() {
           top: '0',
           zIndex: 30,
           borderRadius: 'var(--radius-2xl)',
-          padding: '1rem 1.25rem',
+          padding: '0.75rem 1.25rem',
           display: 'grid',
-          gap: '1rem'
+          gap: '0.625rem'
         }}
       >
+        {/* Row 1: time controls */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.9rem 1.5rem'
+          gap: '0.5rem 1rem',
+          flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem 1rem', flexWrap: 'wrap', flex: '1 1 620px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
-              {GLUCOSE_TIME_RANGES.map((timeRange) => (
-                <button
-                  key={timeRange.key}
-                  type="button"
-                  onClick={() => setSelection({ kind: 'preset', range: timeRange.key })}
-                  className={activePreset === timeRange.key ? 'button-primary' : 'button-ghost'}
-                  style={{ minHeight: '2rem', padding: '0 0.75rem', fontSize: '0.78rem' }}
-                >
-                  {timeRange.label}
-                </button>
-              ))}
-              <GlucoseDateRangePicker
-                value={customValue}
-                onApply={(window) => {
-                  setSelection({ kind: 'custom', window });
-                }}
-              />
-              {newReadingsCount > 0 && (
-                <button
-                  type="button"
-                  onClick={applyUpdates}
-                  className="button-primary"
-                  disabled={isApplyingUpdates}
-                  style={{ minHeight: '2rem', padding: '0 0.85rem', fontSize: '0.78rem', marginLeft: 6 }}
-                >
-                  {isApplyingUpdates
-                    ? 'Loading readings...'
-                  : `Load ${newReadingsCount} new reading${newReadingsCount === 1 ? '' : 's'}`}
-                </button>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <label style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 11,
-                color: 'var(--text-soft)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em'
-              }}>
-                <span>Top</span>
-                <input
-                  type="number"
-                  min={12}
-                  step={1}
-                  inputMode="numeric"
-                  value={chartYMaxInput}
-                  onChange={(event) => setChartYMaxInput(event.target.value)}
-                  style={{
-                    width: 72,
-                    minHeight: '2rem',
-                    padding: '0 0.65rem',
-                    borderRadius: '999px',
-                    border: '1px solid var(--border-strong)',
-                    background: 'var(--surface)',
-                    color: 'var(--text)',
-                    fontSize: 13,
-                    fontFamily: 'var(--font-plex-mono), monospace'
-                  }}
-                  aria-label="Chart top value in mmol/L"
-                />
-              </label>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                flexWrap: 'wrap'
-              }}>
-                <span style={{
-                  fontSize: 11,
-                  color: 'var(--text-soft)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em'
-                }}>
-                  Colors
-                </span>
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: 4,
-                  borderRadius: '999px',
-                  border: '1px solid var(--border-strong)',
-                  background: 'var(--surface)'
-                }}>
-                  {GLUCOSE_COLOR_MODES.map(({ mode, label }) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => updateChartColorMode(mode)}
-                      className={chartColorMode === mode ? 'button-primary' : 'button-ghost'}
-                      style={{ minHeight: '2rem', padding: '0 0.8rem', fontSize: '0.78rem' }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {data && !showLoadingOverlay && (
-                <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
-                  {data.meta.mergedCount} readings ({data.meta.officialCount} official + {data.meta.shareCount} share)
-                </span>
-              )}
-            </div>
-          </div>
-
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            flexWrap: 'wrap',
-            gap: '0.9rem 1.25rem'
+            gap: '0.25rem',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            flexShrink: 1,
+            minWidth: 0,
+            flex: '1 1 auto'
           }}>
-            {!showLoadingOverlay && !error && data && data.items.length > 0 && (
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginRight: '0.5rem', alignItems: 'flex-end' }}>
-                <StatValue label="Avg" value={stats.avg.toFixed(1)} prominent />
-                <StatValue label="Min" value={stats.min.toFixed(1)} color={stats.min < 4 ? '#fb7185' : undefined} />
-                <StatValue label="Max" value={stats.max.toFixed(1)} color={stats.max > 10 ? '#fbbf24' : undefined} />
-                {updatesError && <StatValue label="Updates" value="poll failed" color="#fb7185" />}
-              </div>
+            {GLUCOSE_TIME_RANGES.map((timeRange) => (
+              <button
+                key={timeRange.key}
+                type="button"
+                onClick={() => setSelection({ kind: 'preset', range: timeRange.key })}
+                className={activePreset === timeRange.key ? 'button-primary' : 'button-ghost'}
+                style={{ minHeight: '1.875rem', padding: '0 0.625rem', fontSize: '0.775rem', flexShrink: 0 }}
+              >
+                {timeRange.label}
+              </button>
+            ))}
+            <GlucoseDateRangePicker
+              value={customValue}
+              onApply={(window) => {
+                setSelection({ kind: 'custom', window });
+              }}
+            />
+            {newReadingsCount > 0 && (
+              <button
+                type="button"
+                onClick={applyUpdates}
+                className="button-primary"
+                disabled={isApplyingUpdates}
+                style={{ minHeight: '1.875rem', padding: '0 0.75rem', fontSize: '0.775rem', marginLeft: 4, flexShrink: 0 }}
+              >
+                {isApplyingUpdates
+                  ? 'Loading...'
+                  : `Load ${newReadingsCount} new`}
+              </button>
             )}
+          </div>
 
-            {!showLoadingOverlay && !error && data && data.items.length > 0 && (
-              <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+            <label style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 11,
+              color: 'var(--text-soft)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em'
+            }}>
+              <span>Top</span>
+              <input
+                type="number"
+                min={12}
+                step={1}
+                inputMode="numeric"
+                value={chartYMaxInput}
+                onChange={(event) => setChartYMaxInput(event.target.value)}
+                style={{
+                  width: 64,
+                  minHeight: '1.875rem',
+                  padding: '0 0.625rem',
+                  borderRadius: '999px',
+                  border: '1px solid var(--border-strong)',
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-plex-mono), monospace'
+                }}
+                aria-label="Chart top value in mmol/L"
+              />
+            </label>
+            {data && !showLoadingOverlay && (
+              <span style={{ fontSize: 11, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
+                {data.meta.mergedCount.toLocaleString()} readings
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: stats */}
+        {!showLoadingOverlay && !error && data && data.items.length > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.5rem 1.5rem',
+            flexWrap: 'wrap',
+            paddingTop: '0.375rem',
+            borderTop: '1px solid var(--border)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1.25rem', flexWrap: 'wrap' }}>
+              <StatValue label="Avg" value={stats.avg.toFixed(1)} color={avgColor} size="lg" />
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.875rem', paddingBottom: 2 }}>
+                <StatValue label="Min" value={stats.min.toFixed(1)} color={stats.min < 4 ? '#fb7185' : 'var(--text-dim)'} />
+                <StatValue label="Max" value={stats.max.toFixed(1)} color={stats.max > 10 ? '#fbbf24' : 'var(--text-dim)'} />
+                {updatesError && <StatValue label="Updates" value="stale" color="#fb7185" />}
+              </div>
+            </div>
+
+            <div style={{ overflow: 'hidden', minWidth: 0, flex: '1 1 auto' }}>
+              <div style={{
+                display: 'flex',
+                gap: '0.625rem',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
+                paddingBottom: 2
+              }}>
                 <GlucoseStatRing label="Very low" percentage={stats.veryLow.percentage} color="#e11d48" />
                 <GlucoseStatRing label="Low" percentage={stats.low.percentage} color="#fb7185" />
                 <GlucoseStatRing label="In range" percentage={stats.inRange.percentage} color="#34d399" />
                 <GlucoseStatRing label="High" percentage={stats.high.percentage} color="#fbbf24" />
                 <GlucoseStatRing label="Very high" percentage={stats.veryHigh.percentage} color="#f97316" />
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <section className="panel" style={{
-        marginTop: '1rem',
+        marginTop: '0.75rem',
         borderRadius: 'var(--radius-2xl)',
         overflow: 'hidden',
         padding: 0
       }}>
         <div style={{
           display: 'flex',
-          justifyContent: 'flex-end',
-          padding: '0.75rem 1rem 0',
-          fontSize: 11,
-          color: 'var(--text-soft)'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.625rem 1rem 0',
+          gap: '0.75rem'
         }}>
-          <span>Drag to pan · Ctrl or Cmd + scroll to zoom</span>
+          <span style={{
+            fontSize: 11,
+            color: 'var(--text-soft)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+            minWidth: 0
+          }}>
+            Drag to pan · Ctrl or Cmd + scroll to zoom
+          </span>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 3,
+            padding: 3,
+            borderRadius: '999px',
+            border: '1px solid var(--border-strong)',
+            background: 'var(--surface)'
+          }}>
+            {GLUCOSE_COLOR_MODES.map(({ mode, label }) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => updateChartColorMode(mode)}
+                className={chartColorMode === mode ? 'button-primary' : 'button-ghost'}
+                style={{ minHeight: '1.625rem', padding: '0 0.625rem', fontSize: '0.725rem' }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <div style={{ position: 'relative', minHeight: chartHeight }}>
           {showLoadingOverlay && (
