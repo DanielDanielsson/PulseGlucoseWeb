@@ -1,4 +1,5 @@
 import { DashboardErrorState } from '@/components/dashboard/dashboard-error-state';
+import { SharedTimersPanel } from '@/components/dashboard/shared-timers-panel';
 import Link from 'next/link';
 import { PulseApiClientError, fetchApiStatus } from '@/lib/pulse-api/client';
 
@@ -42,6 +43,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="section-stack">
+      <SharedTimersPanel />
+
       <section className="panel dashboard-section">
         <div className="dashboard-section__header">
           <div>

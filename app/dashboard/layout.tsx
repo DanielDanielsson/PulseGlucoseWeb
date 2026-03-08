@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DashboardNotificationsBridge } from '@/components/dashboard/dashboard-notifications-bridge';
 import { DashboardGlucoseBadge } from '@/components/glucose/dashboard-glucose-badge';
 import { requireOwnerSession } from '@/lib/auth';
 import { fetchConsumerProfile } from '@/lib/pulse-api/client';
@@ -26,6 +27,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   return (
     <main className="page-frame">
+      <DashboardNotificationsBridge />
       <div className="dashboard-fullwidth-container section-stack">
         <section className="panel dashboard-hero">
           <div className="dashboard-hero__header">
