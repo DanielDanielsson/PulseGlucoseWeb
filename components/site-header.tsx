@@ -32,12 +32,12 @@ export async function SiteHeader() {
                 {link.label}
               </Link>
             ))}
-          </nav>
-          <div className="site-header__utility">
-            <Link href={session ? '/dashboard' : '/login'} className="button-secondary site-header__cta">
+            <Link href={session ? '/dashboard' : '/login'} className="site-nav__link site-nav__link--cta">
               {session ? 'Dashboard' : 'Sign in'}
             </Link>
             {session && <SignOutButton />}
+          </nav>
+          <div className="site-header__utility">
             <ThemeToggle />
           </div>
         </div>
