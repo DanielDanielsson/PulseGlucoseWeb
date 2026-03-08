@@ -85,3 +85,74 @@ export interface PulseApiErrorResponse {
     message?: string;
   };
 }
+
+export interface NotificationEvent<TPayload = unknown> {
+  id: string;
+  seq: number;
+  type: string;
+  title: string;
+  message: string | null;
+  payload: TPayload;
+  timestamp: string;
+  sender: {
+    apiKeyId: string | null;
+    apiKeyName: string | null;
+  };
+}
+
+export interface NotificationProfilePatch {
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+  timezone?: string | null;
+  glucoseUnit?: string | null;
+  profileImageUrl?: string | null;
+  defaultAlarmSoundId?: string | null;
+}
+
+export interface SettingsProfileUpdatedPayload {
+  updatedAt?: string | null;
+  refetchPath?: string | null;
+  profile?: NotificationProfilePatch | null;
+}
+
+export interface SharedTimer {
+  id: string;
+  durationSeconds: number;
+  createdAt: string;
+  fireAt: string;
+  removedAt: string | null;
+  createdBy: {
+    apiKeyId: string | null;
+    apiKeyName: string | null;
+  };
+}
+
+export interface SharedTimerListResponse {
+  items: SharedTimer[];
+  serverNow: string;
+}
+
+export interface CreateSharedTimerPayload {
+  durationSeconds: number;
+}
+
+export interface SharedTimerMutationResponse {
+  timer: SharedTimer;
+  serverNow: string;
+}
+
+export interface TimerStartedPayload {
+  timer?: SharedTimer | null;
+  serverNow?: string | null;
+}
+
+export interface TimerRemovedPayload {
+  timerId?: string | null;
+  serverNow?: string | null;
+}
+
+export interface SharedTimerStreamConnectedPayload {
+  items: SharedTimer[];
+  serverNow: string;
+}
