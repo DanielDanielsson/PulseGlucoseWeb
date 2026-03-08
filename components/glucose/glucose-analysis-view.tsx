@@ -6,6 +6,7 @@ import { GlucoseChart } from './glucose-chart';
 import { GlucoseAgpChart } from './glucose-agp-chart';
 import { GlucoseDateRangePicker } from './glucose-date-range-picker';
 import { GlucoseStatRing } from './glucose-stat-ring';
+import { GLUCOSE_COLOR_MODES, type GlucoseColorMode } from '@/lib/glucose/tints';
 import {
   buildPresetWindow,
   getHistoryCustomKey,
@@ -29,6 +30,8 @@ async function fetchJson<T>(url: string): Promise<T> {
 
   return json;
 }
+
+const GLUCOSE_CHART_COLOR_MODE_STORAGE_KEY = 'pulse-glucose-chart-color-mode';
 
 function getUpdatesKey(timestamp: string): string {
   return `/api/dashboard/glucose/updates?since=${encodeURIComponent(timestamp)}`;
@@ -84,6 +87,7 @@ export function GlucoseAnalysisView() {
   });
   const [chartHeight, setChartHeight] = useState(560);
   const [chartYMaxInput, setChartYMaxInput] = useState('25');
+  const [chartColorMode, setChartColorMode] = useState<GlucoseColorMode>('threeColors');
   const [isApplyingUpdates, setIsApplyingUpdates] = useState(false);
   const { cache, mutate: globalMutate } = useSWRConfig();
 
@@ -130,6 +134,17 @@ export function GlucoseAnalysisView() {
   }, []);
 
   useEffect(() => {
+    try {
+      const storedValue = localStorage.getItem(GLUCOSE_CHART_COLOR_MODE_STORAGE_KEY);
+      if (storedValue === 'threeColors' || storedValue === 'gradient') {
+        setChartColorMode(storedValue);
+      }
+    } catch {
+      setChartColorMode('threeColors');
+    }
+  }, []);
+
+  useEffect(() => {
     if (data?.latest) {
       window.dispatchEvent(new CustomEvent('pulse-glucose-latest', { detail: data.latest }));
     }
@@ -152,6 +167,16 @@ export function GlucoseAnalysisView() {
 
   const activePreset = selection.kind === 'preset' ? selection.range : null;
   const customValue = selection.kind === 'custom' ? selection.window : null;
+
+  function updateChartColorMode(mode: GlucoseColorMode) {
+    setChartColorMode(mode);
+
+    try {
+      localStorage.setItem(GLUCOSE_CHART_COLOR_MODE_STORAGE_KEY, mode);
+    } catch {
+      return;
+    }
+  }
 
   return (
     <div className="glucose-analysis-fullwidth">
@@ -240,6 +265,42 @@ export function GlucoseAnalysisView() {
                   aria-label="Chart top value in mmol/L"
                 />
               </label>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap'
+              }}>
+                <span style={{
+                  fontSize: 11,
+                  color: 'var(--text-soft)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em'
+                }}>
+                  Colors
+                </span>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: 4,
+                  borderRadius: '999px',
+                  border: '1px solid var(--border-strong)',
+                  background: 'var(--surface)'
+                }}>
+                  {GLUCOSE_COLOR_MODES.map(({ mode, label }) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateChartColorMode(mode)}
+                      className={chartColorMode === mode ? 'button-primary' : 'button-ghost'}
+                      style={{ minHeight: '2rem', padding: '0 0.8rem', fontSize: '0.78rem' }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {data && !showLoadingOverlay && (
                 <span style={{ fontSize: 11, color: 'var(--text-soft)' }}>
                   {data.meta.mergedCount} readings ({data.meta.officialCount} official + {data.meta.shareCount} share)
@@ -347,7 +408,7 @@ export function GlucoseAnalysisView() {
 
           {!error && data && data.items.length > 0 && (
             <div style={{ opacity: isValidating || isApplyingUpdates ? 0.55 : 1, transition: 'opacity 200ms ease' }}>
-              <GlucoseChart data={data.items} height={chartHeight} yMax={chartYMax} />
+              <GlucoseChart data={data.items} height={chartHeight} yMax={chartYMax} colorMode={chartColorMode} />
             </div>
           )}
         </div>
