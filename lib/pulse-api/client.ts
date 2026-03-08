@@ -1,10 +1,14 @@
 import type {
   ApiKeyCreateResponse,
   ApiKeyListResponse,
+  CreateSharedTimerPayload,
   ConsumerProfileResponse,
   ConsumerProfileUpdatePayload,
   PulseApiErrorResponse,
-  PulseApiStatusReport
+  PulseApiStatusReport,
+  SharedTimer,
+  SharedTimerMutationResponse,
+  SharedTimerListResponse
 } from '@/lib/pulse-api/types';
 
 export class PulseApiClientError extends Error {
@@ -66,8 +70,35 @@ function createAdminHeaders(extraHeaders: HeadersInit = {}): Headers {
   return headers;
 }
 
+function createConsumerHeaders(extraHeaders: HeadersInit = {}): Headers {
+  const headers = new Headers(extraHeaders);
+  const consumerKey = process.env.PULSE_API_CONSUMER_KEY?.trim();
+  const token = consumerKey || getRequiredEnv('PULSE_API_ADMIN_TOKEN');
+  headers.set('Authorization', `Bearer ${token}`);
+  return headers;
+}
+
 async function adminJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = createAdminHeaders(init.headers);
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(resolveUrl(path), {
+    ...init,
+    headers,
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    await parseError(response);
+  }
+
+  return parseJson<T>(response);
+}
+
+async function consumerJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = createConsumerHeaders(init.headers);
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
@@ -170,4 +201,35 @@ export async function fetchDexcomConnectLocation(): Promise<string> {
   }
 
   return location.startsWith('http') ? location : new URL(location, getApiBaseUrl()).toString();
+}
+
+export async function fetchSharedTimers(): Promise<SharedTimerListResponse> {
+  return consumerJson<SharedTimerListResponse>('/api/v1/timers', {
+    method: 'GET'
+  });
+}
+
+export async function createSharedTimer(payload: CreateSharedTimerPayload): Promise<SharedTimer> {
+  const response = await createSharedTimerMutation(payload);
+  return response.timer;
+}
+
+export async function createSharedTimerMutation(
+  payload: CreateSharedTimerPayload
+): Promise<SharedTimerMutationResponse> {
+  return consumerJson<SharedTimerMutationResponse>('/api/v1/timers', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function removeSharedTimer(id: string): Promise<SharedTimer> {
+  const response = await removeSharedTimerMutation(id);
+  return response.timer;
+}
+
+export async function removeSharedTimerMutation(id: string): Promise<SharedTimerMutationResponse> {
+  return consumerJson<SharedTimerMutationResponse>(`/api/v1/timers/${encodeURIComponent(id)}`, {
+    method: 'DELETE'
+  });
 }
