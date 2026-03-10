@@ -93,7 +93,7 @@ export function GlucoseAnalysisView() {
     kind: 'preset',
     range: '24h'
   });
-  const [chartHeight, setChartHeight] = useState(560);
+  const [chartHeight, setChartHeight] = useState(500);
   const [chartYMaxInput, setChartYMaxInput] = useState('25');
   const [chartColorMode, setChartColorMode] = useState<GlucoseColorMode>('threeColors');
   const [isApplyingUpdates, setIsApplyingUpdates] = useState(false);
@@ -138,11 +138,7 @@ export function GlucoseAnalysisView() {
   );
 
   useEffect(() => {
-    const isMobile = window.innerWidth < 640;
-    setChartHeight(isMobile
-      ? Math.max(320, window.innerHeight * 0.45)
-      : Math.max(500, window.innerHeight * 0.58)
-    );
+    setChartHeight(window.innerWidth < 640 ? 340 : 500);
   }, []);
 
   useEffect(() => {

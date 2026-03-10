@@ -1,12 +1,9 @@
 'use client';
 
-import type { CSSProperties } from 'react';
 import { useEffect, useId, useState } from 'react';
 
-type GlucoseRange = 'low' | 'normal' | 'high';
 type TrendDirection = 'up' | 'up-slight' | 'stable' | 'down-slight' | 'down';
 type IndicatorSize = 'sm' | 'md' | 'lg';
-
 interface GlucoseIndicatorProps {
   value: number;
   trend: string;
@@ -15,96 +12,64 @@ interface GlucoseIndicatorProps {
   timestamp?: string;
 }
 
+const STALE_MS = 15 * 60 * 1000;
+
 const RANGE_COLORS = {
-  low: {
-    dark: {
-      fill: '#ef4444',
-      stroke: '#dc2626',
-      gradientLight: '#fca5a5',
-      gradientDark: '#991b1b',
-      bgFill: 'rgba(69, 10, 10, 0.4)',
-      text: '#ffffff',
-      subText: '#fda4af'
-    },
-    light: {
-      fill: '#ef4444',
-      stroke: '#dc2626',
-      gradientLight: '#fca5a5',
-      gradientDark: '#991b1b',
-      bgFill: '#fef2f2',
-      text: '#b91c1c',
-      subText: '#991b1b'
-    }
+  low: { dark: '#ef4444', light: '#dc2626' },
+  normal: { dark: '#10b981', light: '#059669' },
+  high: { dark: '#eab308', light: '#ca8a04' }
+} as const;
+
+const STALE_COLOR = { dark: 'rgba(248,250,252,0.25)', light: '#94a3b8' } as const;
+
+const SIZE_CONFIG = {
+  sm: {
+    outer: 112,
+    strokeWidth: 4,
+    fontSize: 20,
+    unitSize: 11,
+    ageSize: 10,
+    pointerLength: 10,
+    pointerWidth: 15,
+    innerRadius: 26,
+    arrowOverlap: 7
   },
-  normal: {
-    dark: {
-      fill: '#10b981',
-      stroke: '#059669',
-      gradientLight: '#6ee7b7',
-      gradientDark: '#047857',
-      bgFill: 'rgba(2, 50, 26, 0.4)',
-      text: '#ffffff',
-      subText: '#9fdcc4'
-    },
-    light: {
-      fill: '#10b981',
-      stroke: '#059669',
-      gradientLight: '#6ee7b7',
-      gradientDark: '#047857',
-      bgFill: '#ecfdf5',
-      text: '#047857',
-      subText: '#065f46'
-    }
+  md: {
+    outer: 146,
+    strokeWidth: 6,
+    fontSize: 28,
+    unitSize: 12,
+    ageSize: 11,
+    pointerLength: 12,
+    pointerWidth: 19,
+    innerRadius: 35,
+    arrowOverlap: 9
   },
-  high: {
-    dark: {
-      fill: '#eab308',
-      stroke: '#ca8a04',
-      gradientLight: '#fde047',
-      gradientDark: '#a16207',
-      bgFill: 'rgba(66, 32, 6, 0.45)',
-      text: '#ffffff',
-      subText: '#fcd34d'
-    },
-    light: {
-      fill: '#eab308',
-      stroke: '#ca8a04',
-      gradientLight: '#fef08a',
-      gradientDark: '#a16207',
-      bgFill: '#fefce8',
-      text: '#a16207',
-      subText: '#854d0e'
-    }
+  lg: {
+    outer: 184,
+    strokeWidth: 8,
+    fontSize: 40,
+    unitSize: 13,
+    ageSize: 12,
+    pointerLength: 14,
+    pointerWidth: 23,
+    innerRadius: 46,
+    arrowOverlap: 11
   }
 } as const;
 
-const SIZE_CONFIG: Record<IndicatorSize, {
-  outer: number;
-  ringStroke: number;
-  fontSize: number;
-  unitSize: number;
-  ageSize: number;
-  arrowSize: number;
-  arrowOffset: number;
-  gapDegrees: number;
-}> = {
-  sm: { outer: 112, ringStroke: 6, fontSize: 22, unitSize: 12, ageSize: 11, arrowSize: 14, arrowOffset: 8, gapDegrees: 18 },
-  md: { outer: 146, ringStroke: 8, fontSize: 34, unitSize: 13, ageSize: 12, arrowSize: 18, arrowOffset: 10, gapDegrees: 18 },
-  lg: { outer: 184, ringStroke: 10, fontSize: 52, unitSize: 14, ageSize: 13, arrowSize: 22, arrowOffset: 12, gapDegrees: 18 }
-};
-
-function classifyRange(value: number): GlucoseRange {
+function classifyRange(value: number): 'low' | 'normal' | 'high' {
   if (value < 4.0) return 'low';
   if (value > 10.0) return 'high';
   return 'normal';
 }
 
 function normalizeTrend(trend: string): TrendDirection {
-  const normalized = trend.toLowerCase().replace(/[^a-z]/g, '');
-  if (normalized.includes('risingfast') || normalized.includes('doubleup') || normalized === 'risingquickly') return 'up';
-  if (normalized.includes('rising') || normalized.includes('singleup') || normalized === 'up') return 'up-slight';
-  if (normalized.includes('fallingfast') || normalized.includes('doubledown') || normalized === 'fallingquickly') return 'down';
-  if (normalized.includes('falling') || normalized.includes('singledown') || normalized === 'down') return 'down-slight';
+  const s = trend.toLowerCase().replace(/[^a-z]/g, '');
+  if (s.includes('risingfast') || s.includes('doubleup') || s === 'risingquickly') return 'up';
+  if (s.includes('rising') || s.includes('singleup') || s === 'up') return 'up-slight';
+  if (s.includes('fallingfast') || s.includes('doubledown') || s === 'fallingquickly') return 'down';
+  if (s.includes('falling') || s.includes('singledown') || s === 'down') return 'down-slight';
   return 'stable';
 }
 
@@ -118,54 +83,51 @@ function formatAge(timestamp: string): string {
   return `${hours}h ${minutes % 60}m ago`;
 }
 
-function TrendArrow({
-  direction,
-  color,
-  size,
-  offset
-}: {
-  direction: TrendDirection;
-  color: string;
-  size: number;
-  offset: number;
-}) {
-  const half = size / 2;
-  const arrows: Record<TrendDirection, { transform: string; position: CSSProperties }> = {
-    up: {
-      transform: '',
-      position: { top: -offset - size, left: '50%', marginLeft: -half }
-    },
-    'up-slight': {
-      transform: 'rotate(45deg)',
-      position: { top: -offset - half, right: -offset - half }
-    },
-    stable: {
-      transform: 'rotate(90deg)',
-      position: { top: '50%', right: -offset - size, marginTop: -half }
-    },
-    'down-slight': {
-      transform: 'rotate(135deg)',
-      position: { bottom: -offset - half, right: -offset - half }
-    },
-    down: {
-      transform: 'rotate(180deg)',
-      position: { bottom: -offset - size, left: '50%', marginLeft: -half }
-    }
+function trendAngleDeg(dir: TrendDirection): number {
+  const map: Record<TrendDirection, number> = {
+    up: -90,
+    'up-slight': -45,
+    stable: 0,
+    'down-slight': 45,
+    down: 90
   };
+  return map[dir];
+}
 
-  const { transform, position } = arrows[direction];
+/**
+ * Builds the integrated-path shape: an open circle arc with an arrowhead
+ * at the given angle. The arc goes the SHORT way around (leaving a gap
+ * where the arrow sits), so the arrow appears as a separate chevron
+ * attached to the circle boundary.
+ */
+function buildIntegratedPath(
+  cx: number,
+  outerR: number,
+  pLen: number,
+  pWidth: number,
+  angleDeg: number,
+  overlap: number
+): string {
+  const a = (angleDeg * Math.PI) / 180;
+  const bR = outerR - overlap;
 
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      style={{ position: 'absolute', ...position, transform }}
-    >
-      <path d="M12 4L6 12h4v8h4v-8h4L12 4z" fill={color} />
-    </svg>
-  );
+  const tipX = cx + (outerR + pLen - overlap) * Math.cos(a);
+  const tipY = cx + (outerR + pLen - overlap) * Math.sin(a);
+
+  const a1 = a - Math.atan2(pWidth / 2, bR);
+  const a2 = a + Math.atan2(pWidth / 2, bR);
+
+  const b1x = cx + bR * Math.cos(a1);
+  const b1y = cx + bR * Math.sin(a1);
+  const b2x = cx + bR * Math.cos(a2);
+  const b2y = cx + bR * Math.sin(a2);
+
+  // Calculate the angular gap to decide arc direction.
+  let angleDiff = a2 - a1;
+  if (angleDiff < 0) angleDiff += 2 * Math.PI;
+  const largeArcFlag = angleDiff > Math.PI ? 1 : 0;
+
+  return `M ${tipX} ${tipY} L ${b1x} ${b1y} A ${bR} ${bR} 0 ${largeArcFlag} 1 ${b2x} ${b2y} Z`;
 }
 
 export function GlucoseIndicator({
@@ -177,130 +139,126 @@ export function GlucoseIndicator({
 }: GlucoseIndicatorProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [, setTick] = useState(0);
-  const gradientId = useId().replace(/:/g, '-');
-  const glowId = `${gradientId}-glow`;
+  const uid = useId().replace(/:/g, '-');
+
+  const isStale = timestamp
+    ? Date.now() - new Date(timestamp).getTime() > STALE_MS
+    : false;
+  const isLive = !isStale && !!timestamp;
+
   const range = classifyRange(value);
   const direction = normalizeTrend(trend);
-  const colors = RANGE_COLORS[range][theme];
-  const config = SIZE_CONFIG[size];
-  const radius = (config.outer - config.ringStroke) / 2;
-  const center = config.outer / 2;
-  const circumference = 2 * Math.PI * radius;
-  const gapLength = circumference * (config.gapDegrees / 360);
-  const visibleLength = circumference - gapLength;
+  const color = isStale ? STALE_COLOR[theme] : RANGE_COLORS[range][theme];
+  const cfg = SIZE_CONFIG[size];
+
+  const cx = cfg.outer / 2;
+  const outerR = (cfg.outer - cfg.pointerLength * 2 - cfg.strokeWidth * 2) / 2;
+  const bR = outerR - cfg.arrowOverlap;
+  const angleDeg = trendAngleDeg(direction);
+  const sw = cfg.strokeWidth / 2;
+
+  const path = buildIntegratedPath(cx, outerR, cfg.pointerLength, cfg.pointerWidth, angleDeg, cfg.arrowOverlap);
+
+  const displayValue = isStale ? '--' : value.toFixed(1);
+  const textFill = theme === 'dark' ? '#f1f5f9' : color;
+  const staleGlowId = `${uid}-sg`;
 
   useEffect(() => {
-    const applyTheme = () => {
+    const apply = () => {
       setTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
     };
-
-    applyTheme();
-
-    const observer = new MutationObserver(applyTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
-
-    return () => observer.disconnect();
+    apply();
+    const obs = new MutationObserver(apply);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
   }, []);
 
   useEffect(() => {
-    if (!timestamp) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setTick((current) => current + 1);
-    }, 60_000);
-
-    return () => window.clearInterval(interval);
+    if (!timestamp) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
   }, [timestamp]);
 
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      <div style={{ position: 'relative', width: config.outer, height: config.outer }}>
-        <svg width={config.outer} height={config.outer} viewBox={`0 0 ${config.outer} ${config.outer}`}>
+      <svg
+        width={cfg.outer}
+        height={cfg.outer}
+        viewBox={`0 0 ${cfg.outer} ${cfg.outer}`}
+        style={{ overflow: 'visible' }}
+      >
+        {isStale && (
           <defs>
-            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={colors.gradientLight} />
-              <stop offset="45%" stopColor={colors.fill} />
-              <stop offset="100%" stopColor={colors.gradientDark} />
-            </linearGradient>
-            <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation={theme === 'dark' ? 4 : 2} result="blur" />
+            <filter id={staleGlowId} x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
           </defs>
+        )}
 
-          <circle
-            cx={center}
-            cy={center}
-            r={radius - config.ringStroke * 0.85}
-            fill={colors.bgFill}
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth="1"
+        {/* Outlined circle + arrow */}
+        {isStale ? (
+          <>
+            <circle
+              cx={cx}
+              cy={cx}
+              r={outerR}
+              fill="none"
+              stroke={color}
+              strokeWidth={sw}
+              filter={`url(#${staleGlowId})`}
+            />
+          </>
+        ) : (
+          <path
+            d={path}
+            fill="transparent"
+            stroke={color}
+            strokeWidth={sw}
           />
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="rgba(148, 163, 184, 0.18)"
-            strokeWidth={config.ringStroke}
-          />
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={`url(#${gradientId})`}
-            strokeWidth={config.ringStroke}
-            strokeDasharray={`${visibleLength} ${gapLength}`}
-            strokeDashoffset={circumference * 0.12}
-            strokeLinecap="round"
-            filter={`url(#${glowId})`}
-          />
-          <text
-            x={center}
-            y={center}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill={colors.text}
-            fontSize={config.fontSize}
-            fontWeight={700}
-            fontFamily="var(--font-plex-mono), monospace"
-            style={{ letterSpacing: '-0.04em' }}
-          >
-            {value.toFixed(1)}
-          </text>
-        </svg>
-        <TrendArrow
-          direction={direction}
-          color={colors.fill}
-          size={config.arrowSize}
-          offset={config.arrowOffset}
+        )}
+
+        {/* Inner circle */}
+        <circle
+          cx={cx}
+          cy={cx}
+          r={cfg.innerRadius}
+          fill="transparent"
+          stroke={isStale ? color : color}
+          strokeWidth={sw}
+          filter={isStale ? `url(#${staleGlowId})` : undefined}
         />
-      </div>
+
+        {/* Value */}
+        <text
+          x={cx}
+          y={cx}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={isStale ? 'rgba(241,245,249,0.6)' : textFill}
+          fontSize={cfg.fontSize}
+          fontWeight={700}
+          fontFamily="var(--font-plex-mono), monospace"
+          style={{ letterSpacing: '-0.04em' }}
+        >
+          {displayValue}
+        </text>
+      </svg>
 
       <span style={{
-        fontSize: config.unitSize,
-        color: colors.subText,
+        fontSize: cfg.unitSize,
+        color: 'var(--text-soft)',
         fontWeight: 600,
         letterSpacing: '0.14em',
         textTransform: 'uppercase'
       }}>
         {unit}
       </span>
-
       {timestamp && (
-        <span style={{
-          fontSize: config.ageSize,
-          color: 'var(--text-dim)'
-        }}>
+        <span style={{ fontSize: cfg.ageSize, color: 'var(--text-dim)' }}>
           {formatAge(timestamp)}
         </span>
       )}

@@ -285,9 +285,6 @@ export function GlucoseAgpChart({ data, height = 320, yMax = 25 }: GlucoseAgpCha
           }}>
             AGP
           </div>
-          <div style={{ fontSize: 15, color: 'var(--text)' }}>
-            Ambulatory glucose profile
-          </div>
         </div>
         <div style={{
           display: 'flex',
