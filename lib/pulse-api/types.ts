@@ -20,6 +20,7 @@ export interface PulseApiStatusReport {
   generatedAt: string;
   official: PulseApiSourceStatus;
   share: PulseApiSourceStatus;
+  tandem: PulseApiSourceStatus;
 }
 
 export interface AlarmSound {

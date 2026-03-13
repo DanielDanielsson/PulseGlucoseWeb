@@ -287,6 +287,7 @@ export function GlucoseAnalysisView() {
             {data && !showLoadingOverlay && (
               <span style={{ fontSize: 11, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
                 {data.meta.mergedCount.toLocaleString()} readings
+                {data.meta.tandemBasalCount > 0 ? ` · ${data.meta.tandemBasalCount.toLocaleString()} basal changes` : ''}
               </span>
             )}
           </div>
@@ -434,7 +435,13 @@ export function GlucoseAnalysisView() {
 
           {!error && data && data.items.length > 0 && (
             <div style={{ opacity: isValidating || isApplyingUpdates ? 0.55 : 1, transition: 'opacity 200ms ease' }}>
-              <GlucoseChart data={data.items} height={chartHeight} yMax={chartYMax} colorMode={chartColorMode} />
+              <GlucoseChart
+                data={data.items}
+                basalData={data.basalItems}
+                height={chartHeight}
+                yMax={chartYMax}
+                colorMode={chartColorMode}
+              />
             </div>
           )}
         </div>

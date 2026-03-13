@@ -16,6 +16,22 @@ function response(from: string, to: string): GlucoseApiResponse {
       { timestamp: '2026-03-06T12:00:00.000Z', valueMmolL: 5.4, source: 'share' },
       { timestamp: to, valueMmolL: 5.8, source: 'official' }
     ],
+    basalItems: [
+      {
+        timestamp: '2026-03-06T08:00:00.000Z',
+        basalRateUnitsPerHour: 0.7,
+        eventName: 'BasalDelivery',
+        localTimestamp: '2026-03-06T09:00:00',
+        pumpTimeZone: 'Europe/Stockholm'
+      },
+      {
+        timestamp: '2026-03-06T12:00:00.000Z',
+        basalRateUnitsPerHour: 1.2,
+        eventName: 'BasalDelivery',
+        localTimestamp: '2026-03-06T13:00:00',
+        pumpTimeZone: 'Europe/Stockholm'
+      }
+    ],
     latest: {
       timestamp: to,
       valueMmolL: 5.8,
@@ -28,7 +44,8 @@ function response(from: string, to: string): GlucoseApiResponse {
       to,
       officialCount: 2,
       shareCount: 1,
-      mergedCount: 3
+      mergedCount: 3,
+      tandemBasalCount: 2
     }
   };
 }
@@ -72,8 +89,39 @@ describe('glucose history cache helpers', () => {
 
     expect(sliced.items).toHaveLength(1);
     expect(sliced.items[0].timestamp).toBe('2026-03-06T12:00:00.000Z');
+    expect(sliced.basalItems).toHaveLength(2);
+    expect(sliced.basalItems[0].timestamp).toBe('2026-03-06T08:00:00.000Z');
+    expect(sliced.basalItems[1].timestamp).toBe('2026-03-06T12:00:00.000Z');
     expect(sliced.meta.officialCount).toBe(0);
     expect(sliced.meta.shareCount).toBe(1);
+    expect(sliced.meta.tandemBasalCount).toBe(2);
+  });
+
+  test('keeps the last basal step before the requested window', () => {
+    const base = response('2026-03-06T00:00:00.000Z', '2026-03-07T00:00:00.000Z');
+    const sliced = sliceHistoryResponseToWindow(
+      {
+        ...base,
+        basalItems: [
+          {
+            timestamp: '2026-03-06T04:00:00.000Z',
+            basalRateUnitsPerHour: 0.6,
+            eventName: 'BasalDelivery',
+            localTimestamp: '2026-03-06T05:00:00',
+            pumpTimeZone: 'Europe/Stockholm'
+          },
+          ...base.basalItems
+        ]
+      },
+      {
+        from: '2026-03-06T06:00:00.000Z',
+        to: '2026-03-06T18:00:00.000Z'
+      }
+    );
+
+    expect(sliced.basalItems).toHaveLength(3);
+    expect(sliced.basalItems[0].timestamp).toBe('2026-03-06T04:00:00.000Z');
+    expect(sliced.meta.tandemBasalCount).toBe(3);
   });
 
   test('buildPresetWindow uses the requested preset duration ending at the provided timestamp', () => {

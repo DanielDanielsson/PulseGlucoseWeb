@@ -58,7 +58,9 @@ describe('dashboard glucose history route', () => {
         source: 'official'
       })
     ]);
+    expect(json.basalItems).toEqual([]);
     expect(json.meta.mergedCount).toBe(1);
+    expect(json.meta.tandemBasalCount).toBe(0);
   });
 
   test('returns sliced merged history and a resilient latest reading for ranged requests', async () => {
@@ -85,6 +87,15 @@ describe('dashboard glucose history route', () => {
     fetchMergedGlucoseWindow.mockResolvedValue({
       officialItems: merged.filter((item) => item.source === 'official'),
       shareItems: merged.filter((item) => item.source === 'share'),
+      tandemBasalItems: [
+        {
+          timestamp: '2026-03-07T09:45:00.000Z',
+          basalRateUnitsPerHour: 0.8,
+          eventName: 'BasalDelivery',
+          localTimestamp: '2026-03-07T10:45:00',
+          pumpTimeZone: 'Europe/Stockholm'
+        }
+      ],
       merged
     });
 
@@ -100,8 +111,10 @@ describe('dashboard glucose history route', () => {
     expect(fetchMergedGlucoseWindow).toHaveBeenCalledTimes(1);
     expect(json.latest).toEqual(latest);
     expect(json.items).toEqual(merged.slice(-2));
+    expect(json.basalItems).toHaveLength(1);
     expect(json.meta.officialCount).toBe(2);
     expect(json.meta.shareCount).toBe(1);
     expect(json.meta.mergedCount).toBe(2);
+    expect(json.meta.tandemBasalCount).toBe(1);
   });
 });

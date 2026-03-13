@@ -10,6 +10,24 @@ export interface GlucoseHistoryResponse {
   };
 }
 
+export interface TandemBasalHistoryPoint {
+  timestamp: string;
+  basalRateUnitsPerHour: number;
+  eventName: string;
+  localTimestamp: string;
+  pumpTimeZone: string;
+}
+
+export interface TandemBasalHistoryResponse {
+  items: TandemBasalHistoryPoint[];
+  meta: {
+    from: string;
+    to: string;
+    limit: number;
+    returned: number;
+  };
+}
+
 export interface MergedGlucosePoint {
   timestamp: string;
   valueMmolL: number;
@@ -85,6 +103,28 @@ export async function fetchGlucoseLatest(
   }
 
   return response.json() as Promise<PulseApiReading>;
+}
+
+export async function fetchTandemBasalHistory(
+  from: string,
+  to: string,
+  limit = 2000
+): Promise<TandemBasalHistoryResponse> {
+  const url = new URL(resolveUrl('/api/v1/tandem/basal/history'));
+  url.searchParams.set('from', from);
+  url.searchParams.set('to', to);
+  url.searchParams.set('limit', String(limit));
+
+  const response = await fetch(url.toString(), {
+    headers: createHeaders(),
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Tandem basal history failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<TandemBasalHistoryResponse>;
 }
 
 export function pickLatestGlucoseReading(

@@ -4,6 +4,14 @@ export interface ChartPoint {
   source: 'official' | 'share';
 }
 
+export interface BasalChartPoint {
+  timestamp: string;
+  basalRateUnitsPerHour: number;
+  eventName: string;
+  localTimestamp: string;
+  pumpTimeZone: string;
+}
+
 export interface LatestReading {
   valueMmolL: number;
   valueMgDl: number;
@@ -14,6 +22,7 @@ export interface LatestReading {
 
 export interface GlucoseApiResponse {
   items: ChartPoint[];
+  basalItems: BasalChartPoint[];
   latest: LatestReading | null;
   meta: {
     from: string;
@@ -21,6 +30,7 @@ export interface GlucoseApiResponse {
     officialCount: number;
     shareCount: number;
     mergedCount: number;
+    tandemBasalCount: number;
   };
   error?: { message: string };
 }

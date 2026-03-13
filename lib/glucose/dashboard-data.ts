@@ -1,7 +1,9 @@
 import {
   fetchGlucoseHistory,
   fetchGlucoseLatest,
+  fetchTandemBasalHistory,
   pickLatestGlucoseReading,
+  type TandemBasalHistoryPoint,
   type MergedGlucosePoint,
   mergeGlucoseReadings
 } from '@/lib/pulse-api/glucose';
@@ -26,6 +28,7 @@ export interface ResolvedHistoryWindow {
 export interface MergedWindowResult {
   officialItems: PulseApiReading[];
   shareItems: PulseApiReading[];
+  tandemBasalItems: TandemBasalHistoryPoint[];
   merged: MergedGlucosePoint[];
 }
 
@@ -132,10 +135,16 @@ export async function fetchMergedGlucoseWindow(
     fetchOfficialChunked(from, to).catch(() => [] as PulseApiReading[]),
     fetchGlucoseHistory('share', shareWindowStart, to, 500).catch(() => ({ items: [] as PulseApiReading[] }))
   ]);
+  const tandemBasal = await fetchTandemBasalHistory(from, to, API_MAX_LIMIT).catch(() => ({
+    items: [] as TandemBasalHistoryPoint[]
+  }));
 
   return {
     officialItems,
     shareItems: share.items,
+    tandemBasalItems: tandemBasal.items.sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    ),
     merged: mergeGlucoseReadings(officialItems, share.items)
   };
 }

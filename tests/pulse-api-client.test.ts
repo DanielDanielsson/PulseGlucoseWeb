@@ -20,7 +20,8 @@ describe('pulse api client', () => {
           JSON.stringify({
             generatedAt: '2026-03-06T10:00:00.000Z',
             official: { stable: true, connected: true, latestReading: null, sourceToDbLagMinutes: null, latestReadingAgeMinutes: null },
-            share: { stable: true, connected: true, latestReading: null, sourceToDbLagMinutes: null, latestReadingAgeMinutes: null }
+            share: { stable: true, connected: true, latestReading: null, sourceToDbLagMinutes: null, latestReadingAgeMinutes: null },
+            tandem: { stable: false, connected: true, latestReading: null, sourceToDbLagMinutes: null, latestReadingAgeMinutes: null }
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );

@@ -1,13 +1,14 @@
 'use client';
 
 import { useRef, useEffect, useCallback, useState } from 'react';
-import type { ChartPoint } from '@/lib/glucose/types';
+import type { BasalChartPoint, ChartPoint } from '@/lib/glucose/types';
 import { getGlucoseColor, type GlucoseColorMode } from '@/lib/glucose/tints';
 
 export type { ChartPoint } from '@/lib/glucose/types';
 
 interface GlucoseChartProps {
   data: ChartPoint[];
+  basalData?: BasalChartPoint[];
   height?: number;
   yMax?: number;
   colorMode: GlucoseColorMode;
@@ -16,7 +17,10 @@ interface GlucoseChartProps {
 const LOW_THRESHOLD = 4.0;
 const HIGH_THRESHOLD = 10.0;
 const Y_MIN = 2.0;
-const PADDING = { top: 32, right: 24, bottom: 48, left: 56 };
+const PADDING = { top: 32, right: 72, bottom: 48, left: 56 };
+const BASAL_BAND_HEIGHT = 72;
+const BASAL_BAND_GAP = 18;
+const BASAL_TICK_COUNT = 3;
 const MAX_PX_PER_MS = 0.04;
 const FIT_ALL_EPSILON = 0.001;
 const TICK_INTERVALS_MS = [
@@ -149,7 +153,30 @@ function getYAxisTicks(yMax: number): number[] {
   return ticks;
 }
 
-export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: GlucoseChartProps) {
+function getBasalYMax(values: number[]): number {
+  const maxValue = values.length > 0 ? Math.max(...values) : 0;
+  if (maxValue <= 0) {
+    return 0;
+  }
+
+  return Math.max(1, Math.ceil(maxValue * 2) / 2);
+}
+
+function getBasalTicks(yMax: number): number[] {
+  if (yMax <= 0) {
+    return [];
+  }
+
+  return [0, yMax / 2, yMax].slice(0, BASAL_TICK_COUNT);
+}
+
+export function GlucoseChart({
+  data,
+  basalData = [],
+  height = 400,
+  yMax = 25,
+  colorMode
+}: GlucoseChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -180,11 +207,17 @@ export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: Gluco
   }, []);
 
   const timestamps = data.map((point) => new Date(point.timestamp).getTime());
+  const basalTimestamps = basalData.map((point) => new Date(point.timestamp).getTime());
   const timeStartMs = timestamps[0] ?? 0;
   const timeEndMs = timestamps[timestamps.length - 1] ?? timeStartMs;
   const totalDurationMs = Math.max(1, timeEndMs - timeStartMs);
   const chartWidth = Math.max(0, containerWidth - PADDING.left - PADDING.right);
   const chartHeight = Math.max(0, height - PADDING.top - PADDING.bottom);
+  const hasBasalBand = basalData.length > 0;
+  const basalBandHeight = hasBasalBand ? Math.min(BASAL_BAND_HEIGHT, Math.max(52, chartHeight * 0.24)) : 0;
+  const basalGap = hasBasalBand ? BASAL_BAND_GAP : 0;
+  const glucosePlotHeight = Math.max(0, chartHeight - basalBandHeight - basalGap);
+  const basalBandTop = PADDING.top + glucosePlotHeight + basalGap;
   const fitAllPxPerMs = chartWidth > 0 ? chartWidth / totalDurationMs : 0;
   const minPxPerMs = fitAllPxPerMs > 0 ? fitAllPxPerMs : 0;
   const hoveredPoint = hoveredIndex === null ? null : data[hoveredIndex] ?? null;
@@ -243,7 +276,7 @@ export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: Gluco
 
     function yForValue(value: number): number {
       const clamped = clamp(value, Y_MIN, yMax);
-      return PADDING.top + chartHeight * (1 - (clamped - Y_MIN) / (yMax - Y_MIN));
+      return PADDING.top + glucosePlotHeight * (1 - (clamped - Y_MIN) / (yMax - Y_MIN));
     }
 
     const style = getComputedStyle(document.documentElement);
@@ -309,6 +342,131 @@ export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: Gluco
       ctx.stroke();
     }
 
+    if (hasBasalBand && basalBandHeight > 0) {
+      const basalStartIdx = basalTimestamps.length
+        ? Math.max(0, findLastIndexAtOrBefore(basalTimestamps, visibleStartMs))
+        : -1;
+      const basalEndIdxRaw = findLastIndexAtOrBefore(basalTimestamps, visibleEndMs);
+      const basalEndIdx =
+        basalEndIdxRaw < 0
+          ? -1
+          : Math.min(basalData.length - 1, basalEndIdxRaw + 1);
+      const visibleBasal =
+        basalStartIdx >= 0 && basalEndIdx >= basalStartIdx
+          ? basalData.slice(basalStartIdx, basalEndIdx + 1)
+          : [];
+      const visibleBasalValues = visibleBasal.map((point) => point.basalRateUnitsPerHour);
+      const basalYMax = getBasalYMax(visibleBasalValues);
+
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.07)';
+      ctx.fillRect(PADDING.left, basalBandTop, chartWidth, basalBandHeight);
+
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PADDING.left, basalBandTop);
+      ctx.lineTo(PADDING.left + chartWidth, basalBandTop);
+      ctx.stroke();
+
+      if (basalYMax > 0) {
+        const basalTicks = getBasalTicks(basalYMax);
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.font = '10px var(--font-plex-mono), monospace';
+        for (const tick of basalTicks) {
+          const y =
+            basalBandTop + basalBandHeight - (tick / basalYMax) * basalBandHeight;
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(PADDING.left, y);
+          ctx.lineTo(PADDING.left + chartWidth, y);
+          ctx.stroke();
+
+          ctx.fillStyle = 'rgba(125, 211, 252, 0.88)';
+          ctx.fillText(
+            tick.toFixed(tick % 1 === 0 ? 0 : 1),
+            PADDING.left + chartWidth + 8,
+            y
+          );
+        }
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = textSoft;
+        ctx.fillText('Basal U/hr', PADDING.left + chartWidth + 8, basalBandTop - 4);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(PADDING.left, basalBandTop, chartWidth, basalBandHeight);
+        ctx.clip();
+
+        const basalFloorY = basalBandTop + basalBandHeight - 2;
+        const basalFill = ctx.createLinearGradient(0, basalBandTop, 0, basalFloorY);
+        basalFill.addColorStop(0, 'rgba(56, 189, 248, 0.48)');
+        basalFill.addColorStop(1, 'rgba(14, 165, 233, 0.14)');
+
+        let hasBasalPath = false;
+        ctx.beginPath();
+        for (let i = 0; i < visibleBasal.length; i += 1) {
+          const point = visibleBasal[i];
+          const timestampMs = basalTimestamps[basalStartIdx + i];
+          const nextTimestampMs =
+            i + 1 < visibleBasal.length
+              ? basalTimestamps[basalStartIdx + i + 1]
+              : visibleEndMs;
+          const clampedStartMs = Math.max(timestampMs, visibleStartMs);
+          const clampedEndMs = Math.min(nextTimestampMs, visibleEndMs);
+
+          if (clampedEndMs <= clampedStartMs) {
+            continue;
+          }
+
+          const x = xForTimestamp(clampedStartMs);
+          const width = Math.max(1.5, (clampedEndMs - clampedStartMs) * pxPerMs);
+          const barHeight = Math.max(
+            2,
+            (point.basalRateUnitsPerHour / basalYMax) * (basalBandHeight - 8)
+          );
+          const y = basalFloorY - barHeight;
+
+          ctx.fillStyle = basalFill;
+          ctx.fillRect(x, y, width, basalFloorY - y);
+
+          if (!hasBasalPath) {
+            ctx.moveTo(x, y);
+            hasBasalPath = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+          ctx.lineTo(x + width, y);
+
+          if (timestampMs >= visibleStartMs && timestampMs <= visibleEndMs) {
+            ctx.fillStyle =
+              point.eventName === 'BasalDelivery'
+                ? 'rgba(186, 230, 253, 0.95)'
+                : 'rgba(125, 211, 252, 0.5)';
+            ctx.fillRect(Math.max(PADDING.left, x) - 0.75, y - 4, 1.5, 4);
+          }
+        }
+
+        if (hasBasalPath) {
+          ctx.strokeStyle = 'rgba(186, 230, 253, 0.96)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      } else {
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.font = '10px var(--font-plex-mono), monospace';
+        ctx.fillStyle = textSoft;
+        ctx.fillText('Basal U/hr', PADDING.left + chartWidth + 8, basalBandTop);
+      }
+    }
+
     const visibleDurationMs = Math.max(1, visibleEndMs - visibleStartMs);
     const tickIntervalMs = pickTickInterval(visibleDurationMs, chartWidth);
     const firstTickMs = Math.ceil(visibleStartMs / tickIntervalMs) * tickIntervalMs;
@@ -368,11 +526,11 @@ export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: Gluco
       gradient.addColorStop(1, 'rgba(52, 211, 153, 0.01)');
 
       ctx.beginPath();
-      ctx.moveTo(xForTimestamp(timestamps[startIdx]), PADDING.top + chartHeight);
+      ctx.moveTo(xForTimestamp(timestamps[startIdx]), PADDING.top + glucosePlotHeight);
       for (let i = startIdx; i <= endIdx; i++) {
         ctx.lineTo(xForTimestamp(timestamps[i]), yForValue(data[i].valueMmolL));
       }
-      ctx.lineTo(xForTimestamp(timestamps[endIdx]), PADDING.top + chartHeight);
+      ctx.lineTo(xForTimestamp(timestamps[endIdx]), PADDING.top + glucosePlotHeight);
       ctx.closePath();
       ctx.fillStyle = gradient;
       ctx.fill();
@@ -455,7 +613,26 @@ export function GlucoseChart({ data, height = 400, yMax = 25, colorMode }: Gluco
       ctx.roundRect(barX, barY, barWidth, 3, 1.5);
       ctx.fill();
     }
-  }, [chartHeight, chartWidth, colorMode, containerWidth, data, height, hoveredIndex, timeEndMs, timeStartMs, timestamps, totalDurationMs, yMax]);
+  }, [
+    basalBandHeight,
+    basalBandTop,
+    basalData,
+    chartHeight,
+    chartWidth,
+    colorMode,
+    containerWidth,
+    data,
+    glucosePlotHeight,
+    hasBasalBand,
+    height,
+    hoveredIndex,
+    timeEndMs,
+    timeStartMs,
+    timestamps,
+    basalTimestamps,
+    totalDurationMs,
+    yMax
+  ]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);

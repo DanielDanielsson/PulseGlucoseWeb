@@ -52,6 +52,31 @@ function getCachedData(cache: HistoryCacheLike, key: string): GlucoseApiResponse
   return cache.get(key)?.data;
 }
 
+function pickBasalItemsForWindow(
+  basalItems: GlucoseApiResponse['basalItems'],
+  window: HistoryWindow
+): GlucoseApiResponse['basalItems'] {
+  const toMsValue = toMs(window.to);
+  const candidates = basalItems.filter((item) => toMs(item.timestamp) <= toMsValue);
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const fromMs = toMs(window.from);
+  let startIndex = 0;
+
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    if (toMs(candidates[index].timestamp) <= fromMs) {
+      startIndex = index;
+      break;
+    }
+
+    startIndex = index;
+  }
+
+  return candidates.slice(startIndex);
+}
+
 export function pickBestLoadedSourceKey(
   cache: HistoryCacheLike,
   selection: HistorySelection
@@ -140,16 +165,19 @@ export function sliceHistoryResponseToWindow(
   });
   const officialCount = items.filter((item) => item.source === 'official').length;
   const shareCount = items.length - officialCount;
+  const basalItems = pickBasalItemsForWindow(sourceData.basalItems, window);
 
   return {
     ...sourceData,
     items,
+    basalItems,
     meta: {
       from: window.from,
       to: window.to,
       officialCount,
       shareCount,
-      mergedCount: items.length
+      mergedCount: items.length,
+      tandemBasalCount: basalItems.length
     }
   };
 }
