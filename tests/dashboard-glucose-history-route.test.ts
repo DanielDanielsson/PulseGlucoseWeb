@@ -59,8 +59,10 @@ describe('dashboard glucose history route', () => {
       })
     ]);
     expect(json.basalItems).toEqual([]);
+    expect(json.eventItems).toEqual([]);
     expect(json.meta.mergedCount).toBe(1);
     expect(json.meta.tandemBasalCount).toBe(0);
+    expect(json.meta.tandemEventCount).toBe(0);
   });
 
   test('returns sliced merged history and a resilient latest reading for ranged requests', async () => {
@@ -96,6 +98,19 @@ describe('dashboard glucose history route', () => {
           pumpTimeZone: 'Europe/Stockholm'
         }
       ],
+      tandemEventItems: [
+        {
+          timestamp: '2026-03-07T09:57:00.000Z',
+          eventName: 'BolusDelivery',
+          localTimestamp: '2026-03-07T10:57:00',
+          pumpTimeZone: 'Europe/Stockholm',
+          insulinDelivered: 2.4,
+          insulinRequested: null,
+          iob: null,
+          carbsGrams: null,
+          glucoseMmolL: null
+        }
+      ],
       merged
     });
 
@@ -112,9 +127,11 @@ describe('dashboard glucose history route', () => {
     expect(json.latest).toEqual(latest);
     expect(json.items).toEqual(merged.slice(-2));
     expect(json.basalItems).toHaveLength(1);
+    expect(json.eventItems).toHaveLength(1);
     expect(json.meta.officialCount).toBe(2);
     expect(json.meta.shareCount).toBe(1);
     expect(json.meta.mergedCount).toBe(2);
     expect(json.meta.tandemBasalCount).toBe(1);
+    expect(json.meta.tandemEventCount).toBe(1);
   });
 });

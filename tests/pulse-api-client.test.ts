@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { compressTandemBasalHistory } from '@/lib/pulse-api/glucose';
 
 describe('pulse api client', () => {
   afterEach(() => {
@@ -32,5 +33,39 @@ describe('pulse api client', () => {
     const report = await fetchApiStatus();
 
     expect(report.official.stable).toBe(true);
+  });
+
+  test('compressTandemBasalHistory collapses repeated basal deliveries with the same rate', () => {
+    expect(
+      compressTandemBasalHistory([
+        {
+          timestamp: '2026-03-12T07:00:00.000Z',
+          basalRateUnitsPerHour: 1.23,
+          eventName: 'BasalDelivery',
+          localTimestamp: '2026-03-12T08:00:00',
+          pumpTimeZone: 'Europe/Stockholm'
+        },
+        {
+          timestamp: '2026-03-12T07:05:00.000Z',
+          basalRateUnitsPerHour: 1.19,
+          eventName: 'BasalDelivery',
+          localTimestamp: '2026-03-12T08:05:00',
+          pumpTimeZone: 'Europe/Stockholm'
+        },
+        {
+          timestamp: '2026-03-12T07:10:00.000Z',
+          basalRateUnitsPerHour: 0.86,
+          eventName: 'BasalDelivery',
+          localTimestamp: '2026-03-12T08:10:00',
+          pumpTimeZone: 'Europe/Stockholm'
+        }
+      ]).map((item) => ({
+        timestamp: item.timestamp,
+        rate: item.basalRateUnitsPerHour
+      }))
+    ).toEqual([
+      { timestamp: '2026-03-12T07:00:00.000Z', rate: 1.2 },
+      { timestamp: '2026-03-12T07:10:00.000Z', rate: 0.9 }
+    ]);
   });
 });

@@ -77,6 +77,19 @@ function pickBasalItemsForWindow(
   return candidates.slice(startIndex);
 }
 
+function pickEventItemsForWindow(
+  eventItems: GlucoseApiResponse['eventItems'],
+  window: HistoryWindow
+): GlucoseApiResponse['eventItems'] {
+  const fromMs = toMs(window.from);
+  const toMsValue = toMs(window.to);
+
+  return eventItems.filter((item) => {
+    const timestampMs = toMs(item.timestamp);
+    return timestampMs >= fromMs && timestampMs <= toMsValue;
+  });
+}
+
 export function pickBestLoadedSourceKey(
   cache: HistoryCacheLike,
   selection: HistorySelection
@@ -166,18 +179,21 @@ export function sliceHistoryResponseToWindow(
   const officialCount = items.filter((item) => item.source === 'official').length;
   const shareCount = items.length - officialCount;
   const basalItems = pickBasalItemsForWindow(sourceData.basalItems, window);
+  const eventItems = pickEventItemsForWindow(sourceData.eventItems, window);
 
   return {
     ...sourceData,
     items,
     basalItems,
+    eventItems,
     meta: {
       from: window.from,
       to: window.to,
       officialCount,
       shareCount,
       mergedCount: items.length,
-      tandemBasalCount: basalItems.length
+      tandemBasalCount: basalItems.length,
+      tandemEventCount: eventItems.length
     }
   };
 }

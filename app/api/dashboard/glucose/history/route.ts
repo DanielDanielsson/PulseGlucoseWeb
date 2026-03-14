@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
             ]
           : [],
         basalItems: [],
+        eventItems: [],
         latest,
         meta: {
           from,
@@ -47,17 +48,19 @@ export async function GET(request: NextRequest) {
           officialCount: latest?.source === 'official' ? 1 : 0,
           shareCount: latest?.source === 'share' ? 1 : 0,
           mergedCount: latest ? 1 : 0,
-          tandemBasalCount: 0
+          tandemBasalCount: 0,
+          tandemEventCount: 0
         }
       });
     }
 
-    const { officialItems, shareItems, tandemBasalItems, merged } = await fetchMergedGlucoseWindow(from, to, now);
+    const { officialItems, shareItems, tandemBasalItems, tandemEventItems, merged } = await fetchMergedGlucoseWindow(from, to, now);
     const items = requestedLimit ? merged.slice(-requestedLimit) : merged;
 
     return NextResponse.json({
       items,
       basalItems: tandemBasalItems,
+      eventItems: tandemEventItems,
       latest,
       meta: {
         from,
@@ -65,7 +68,8 @@ export async function GET(request: NextRequest) {
         officialCount: officialItems.length,
         shareCount: shareItems.length,
         mergedCount: items.length,
-        tandemBasalCount: tandemBasalItems.length
+        tandemBasalCount: tandemBasalItems.length,
+        tandemEventCount: tandemEventItems.length
       }
     });
   } catch (error) {

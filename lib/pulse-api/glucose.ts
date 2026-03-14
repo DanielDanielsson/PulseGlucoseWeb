@@ -28,6 +28,72 @@ export interface TandemBasalHistoryResponse {
   };
 }
 
+export interface TandemEventHistoryPoint {
+  timestamp: string;
+  eventName: string;
+  localTimestamp: string;
+  pumpTimeZone: string;
+  insulinDelivered: number | null;
+  insulinRequested: number | null;
+  iob: number | null;
+  carbsGrams: number | null;
+  glucoseMmolL: number | null;
+}
+
+export interface TandemEventHistoryResponse {
+  items: TandemEventHistoryPoint[];
+  meta: {
+    from: string;
+    to: string;
+    limit: number;
+    returned: number;
+  };
+}
+
+const BASAL_VISUAL_STEP = 0.1;
+
+function roundBasalRate(value: number): number {
+  return Number((Math.round(value / BASAL_VISUAL_STEP) * BASAL_VISUAL_STEP).toFixed(1));
+}
+
+export function compressTandemBasalHistory(
+  items: TandemBasalHistoryPoint[]
+): TandemBasalHistoryPoint[] {
+  if (items.length <= 1) {
+    return items;
+  }
+
+  const sorted = [...items].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+  const compressed: TandemBasalHistoryPoint[] = [sorted[0]];
+
+  for (let index = 1; index < sorted.length; index += 1) {
+    const point = sorted[index];
+    const previous = compressed[compressed.length - 1];
+    const roundedRate = roundBasalRate(point.basalRateUnitsPerHour);
+    const previousRoundedRate = roundBasalRate(previous.basalRateUnitsPerHour);
+
+    if (roundedRate === previousRoundedRate) {
+      continue;
+    }
+
+    compressed.push({
+      ...point,
+      basalRateUnitsPerHour: roundedRate
+    });
+  }
+
+  return compressed.map((point, index) =>
+    index === 0
+      ? {
+          ...point,
+          basalRateUnitsPerHour: roundBasalRate(point.basalRateUnitsPerHour)
+        }
+      : point
+  );
+}
+
 export interface MergedGlucosePoint {
   timestamp: string;
   valueMmolL: number;
@@ -125,6 +191,28 @@ export async function fetchTandemBasalHistory(
   }
 
   return response.json() as Promise<TandemBasalHistoryResponse>;
+}
+
+export async function fetchTandemEventHistory(
+  from: string,
+  to: string,
+  limit = 2000
+): Promise<TandemEventHistoryResponse> {
+  const url = new URL(resolveUrl('/api/v1/tandem/events/history'));
+  url.searchParams.set('from', from);
+  url.searchParams.set('to', to);
+  url.searchParams.set('limit', String(limit));
+
+  const response = await fetch(url.toString(), {
+    headers: createHeaders(),
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Tandem event history failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<TandemEventHistoryResponse>;
 }
 
 export function pickLatestGlucoseReading(

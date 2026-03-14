@@ -12,6 +12,18 @@ export interface BasalChartPoint {
   pumpTimeZone: string;
 }
 
+export interface TandemEventChartPoint {
+  timestamp: string;
+  eventName: string;
+  localTimestamp: string;
+  pumpTimeZone: string;
+  insulinDelivered: number | null;
+  insulinRequested: number | null;
+  iob: number | null;
+  carbsGrams: number | null;
+  glucoseMmolL: number | null;
+}
+
 export interface LatestReading {
   valueMmolL: number;
   valueMgDl: number;
@@ -23,6 +35,7 @@ export interface LatestReading {
 export interface GlucoseApiResponse {
   items: ChartPoint[];
   basalItems: BasalChartPoint[];
+  eventItems: TandemEventChartPoint[];
   latest: LatestReading | null;
   meta: {
     from: string;
@@ -31,6 +44,7 @@ export interface GlucoseApiResponse {
     shareCount: number;
     mergedCount: number;
     tandemBasalCount: number;
+    tandemEventCount: number;
   };
   error?: { message: string };
 }

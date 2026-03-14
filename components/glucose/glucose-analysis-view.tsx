@@ -288,6 +288,7 @@ export function GlucoseAnalysisView() {
               <span style={{ fontSize: 11, color: 'var(--text-soft)', whiteSpace: 'nowrap' }}>
                 {data.meta.mergedCount.toLocaleString()} readings
                 {data.meta.tandemBasalCount > 0 ? ` · ${data.meta.tandemBasalCount.toLocaleString()} basal changes` : ''}
+                {data.meta.tandemEventCount > 0 ? ` · ${data.meta.tandemEventCount.toLocaleString()} tandem events` : ''}
               </span>
             )}
           </div>
@@ -438,6 +439,7 @@ export function GlucoseAnalysisView() {
               <GlucoseChart
                 data={data.items}
                 basalData={data.basalItems}
+                eventData={data.eventItems}
                 height={chartHeight}
                 yMax={chartYMax}
                 colorMode={chartColorMode}

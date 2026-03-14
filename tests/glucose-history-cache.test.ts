@@ -32,6 +32,30 @@ function response(from: string, to: string): GlucoseApiResponse {
         pumpTimeZone: 'Europe/Stockholm'
       }
     ],
+    eventItems: [
+      {
+        timestamp: '2026-03-06T07:30:00.000Z',
+        eventName: 'BolusDelivery',
+        localTimestamp: '2026-03-06T08:30:00',
+        pumpTimeZone: 'Europe/Stockholm',
+        insulinDelivered: 2.1,
+        insulinRequested: null,
+        iob: null,
+        carbsGrams: null,
+        glucoseMmolL: null
+      },
+      {
+        timestamp: '2026-03-06T15:30:00.000Z',
+        eventName: 'PumpingSuspended',
+        localTimestamp: '2026-03-06T16:30:00',
+        pumpTimeZone: 'Europe/Stockholm',
+        insulinDelivered: null,
+        insulinRequested: null,
+        iob: null,
+        carbsGrams: null,
+        glucoseMmolL: null
+      }
+    ],
     latest: {
       timestamp: to,
       valueMmolL: 5.8,
@@ -45,7 +69,8 @@ function response(from: string, to: string): GlucoseApiResponse {
       officialCount: 2,
       shareCount: 1,
       mergedCount: 3,
-      tandemBasalCount: 2
+      tandemBasalCount: 2,
+      tandemEventCount: 2
     }
   };
 }
@@ -92,9 +117,13 @@ describe('glucose history cache helpers', () => {
     expect(sliced.basalItems).toHaveLength(2);
     expect(sliced.basalItems[0].timestamp).toBe('2026-03-06T08:00:00.000Z');
     expect(sliced.basalItems[1].timestamp).toBe('2026-03-06T12:00:00.000Z');
+    expect(sliced.eventItems).toHaveLength(2);
+    expect(sliced.eventItems[0].timestamp).toBe('2026-03-06T07:30:00.000Z');
+    expect(sliced.eventItems[1].timestamp).toBe('2026-03-06T15:30:00.000Z');
     expect(sliced.meta.officialCount).toBe(0);
     expect(sliced.meta.shareCount).toBe(1);
     expect(sliced.meta.tandemBasalCount).toBe(2);
+    expect(sliced.meta.tandemEventCount).toBe(2);
   });
 
   test('keeps the last basal step before the requested window', () => {
@@ -122,6 +151,7 @@ describe('glucose history cache helpers', () => {
     expect(sliced.basalItems).toHaveLength(3);
     expect(sliced.basalItems[0].timestamp).toBe('2026-03-06T04:00:00.000Z');
     expect(sliced.meta.tandemBasalCount).toBe(3);
+    expect(sliced.meta.tandemEventCount).toBe(2);
   });
 
   test('buildPresetWindow uses the requested preset duration ending at the provided timestamp', () => {

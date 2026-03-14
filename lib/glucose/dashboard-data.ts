@@ -1,9 +1,12 @@
 import {
+  compressTandemBasalHistory,
   fetchGlucoseHistory,
   fetchGlucoseLatest,
   fetchTandemBasalHistory,
+  fetchTandemEventHistory,
   pickLatestGlucoseReading,
   type TandemBasalHistoryPoint,
+  type TandemEventHistoryPoint,
   type MergedGlucosePoint,
   mergeGlucoseReadings
 } from '@/lib/pulse-api/glucose';
@@ -29,6 +32,7 @@ export interface MergedWindowResult {
   officialItems: PulseApiReading[];
   shareItems: PulseApiReading[];
   tandemBasalItems: TandemBasalHistoryPoint[];
+  tandemEventItems: TandemEventHistoryPoint[];
   merged: MergedGlucosePoint[];
 }
 
@@ -135,16 +139,21 @@ export async function fetchMergedGlucoseWindow(
     fetchOfficialChunked(from, to).catch(() => [] as PulseApiReading[]),
     fetchGlucoseHistory('share', shareWindowStart, to, 500).catch(() => ({ items: [] as PulseApiReading[] }))
   ]);
-  const tandemBasal = await fetchTandemBasalHistory(from, to, API_MAX_LIMIT).catch(() => ({
-    items: [] as TandemBasalHistoryPoint[]
-  }));
+  const [tandemBasal, tandemEvents] = await Promise.all([
+    fetchTandemBasalHistory(from, to, API_MAX_LIMIT).catch(() => ({
+      items: [] as TandemBasalHistoryPoint[]
+    })),
+    fetchTandemEventHistory(from, to, API_MAX_LIMIT).catch(() => ({
+      items: [] as TandemEventHistoryPoint[]
+    }))
+  ]);
+  const tandemBasalItems = compressTandemBasalHistory(tandemBasal.items);
 
   return {
     officialItems,
     shareItems: share.items,
-    tandemBasalItems: tandemBasal.items.sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    ),
+    tandemBasalItems,
+    tandemEventItems: tandemEvents.items,
     merged: mergeGlucoseReadings(officialItems, share.items)
   };
 }
